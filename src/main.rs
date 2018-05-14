@@ -36,8 +36,8 @@ fn main() {
   // add_feed(&url);
   // get_channels();
   // let feed = FeedChannelTemplate::new(&channel);
-  println!("{:#?}", fetch_feed(&url));
-  // start_web();
+  // println!("{:#?}", add_feed(&url));
+  start_web();
 
   // run_hyper();
   // select_channels();

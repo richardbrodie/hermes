@@ -1,1 +1,2 @@
-{% extends "base.html" %} {% block content %} {% include "partials/_channel.html" %} {% endblock %}
+{% extends "base.html" %} {% block content %} {% include "partials/_channel.html" %} {% for item in items %} {% include "partials/_item.html"
+%} {% endfor %} {% endblock %}

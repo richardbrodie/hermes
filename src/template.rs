@@ -11,9 +11,17 @@ pub struct IndexTemplate<'a> {
   pub _parent: BaseTemplate,
   pub channels: &'a Vec<FeedChannel>,
 }
+impl<'a> IndexTemplate<'a> {
+  pub fn new(channels: &'a Vec<FeedChannel>) -> IndexTemplate<'a> {
+    IndexTemplate {
+      _parent: BaseTemplate {},
+      channels: channels,
+    }
+  }
+}
 
 #[derive(Template)]
-#[template(path = "partials/_channel.html")]
+#[template(path = "channel.html")]
 pub struct FeedChannelTemplate<'a> {
   pub _parent: BaseTemplate,
   pub channel: &'a FeedChannel,

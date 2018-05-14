@@ -1,22 +1,34 @@
 use actix;
 use actix_web::http::{header, Method, StatusCode};
 use actix_web::middleware::session::{self, CookieSessionBackend, RequestSession, SessionStorage};
-use actix_web::{
-  error, fs, middleware, pred, server, App, Error, HttpRequest, HttpResponse, Query, Result,
-};
+use actix_web::{error, fs, middleware, pred, server, App, Error, HttpRequest, HttpResponse, Query,
+                Result};
 use std::collections::HashMap;
 
 use askama::Template;
-// use db::get_channels;
-use template::FeedChannelTemplate;
+use db::{get_channel_with_items, get_channels};
+use template::{FeedChannelTemplate, IndexTemplate};
 
-fn index(query: Query<HashMap<String, String>>) -> Result<HttpResponse> {
+fn index(_query: Query<HashMap<String, String>>) -> Result<HttpResponse> {
+  let channels = get_channels();
+  let feed = IndexTemplate::new(&channels);
+
   Ok(
     HttpResponse::Ok()
       .content_type("text/html")
-      // .body(fetch_channels()),
-      .body("hello world"),
+      .body(feed.render().unwrap()),
   )
+}
+fn show_channel(req: HttpRequest) -> HttpResponse {
+  let idstr = req.match_info().get("id").unwrap();
+  let id = idstr.parse::<i32>().unwrap();
+
+  let data = get_channel_with_items(id);
+  let feed = FeedChannelTemplate::new(&data);
+
+  HttpResponse::Ok()
+    .content_type("text/html")
+    .body(feed.render().unwrap())
 }
 
 pub fn start_web() {
@@ -33,6 +45,7 @@ pub fn start_web() {
             .handler("/dist", fs::StaticFiles::new("dist"))
             // redirect
             .resource("/", |r| r.method(Method::GET).with(index))
+            .resource("/feed/{id}", |r| r.method(Method::GET).f(show_channel))
             // default
             .default_resource(|r| {
                 // 404 for GET request
@@ -50,12 +63,6 @@ pub fn start_web() {
   println!("Starting http server: 127.0.0.1:8080");
   let _ = sys.run();
 }
-
-// fn fetch_channels() -> String {
-//   let channels = get_channels();
-//   let feed = FeedChannelTemplate::new(&channels);
-//   feed.render().unwrap()
-// }
 
 /// 404 handler
 fn p404(req: HttpRequest) -> Result<fs::NamedFile> {

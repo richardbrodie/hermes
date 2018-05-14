@@ -13,9 +13,7 @@ pub fn add_feed(url: &str) {
     title: feed.title().to_string(),
     link: feed.link().to_string(),
     description: feed.description().to_string(),
-    updated_at: DateTime::<FixedOffset>::parse_from_rfc2822(feed.pub_date().unwrap())
-      .unwrap()
-      .naive_local(),
+    updated_at: Utc::now().naive_local(),
   };
   insert_channel(&mut channel);
   process_items(feed.items(), channel.id);
@@ -29,7 +27,7 @@ pub fn refresh_feed(channel: &FeedChannel) {
 pub fn fetch_feed(url: &str) -> Result<Channel, reqwest::Error> {
   let body = reqwest::get(url)?;
   let mut channel = Channel::read_from(BufReader::new(body)).unwrap();
-  channel.set_items(vec![Item::default()]);
+  // channel.set_items(vec![Item::default()]);
   Ok(channel)
 }
 

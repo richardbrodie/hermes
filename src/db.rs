@@ -25,6 +25,7 @@ pub struct NewItem<'a> {
   title: &'a str,
   link: &'a str,
   description: &'a str,
+  published_at: &'a NaiveDateTime,
   feed_channel_id: &'a i32,
 }
 
@@ -46,6 +47,7 @@ pub fn insert_items(items: &Vec<FeedItem>) {
       title: &item.title,
       link: &item.link,
       description: &item.description,
+      published_at: &item.published_at,
       feed_channel_id: &item.feed_channel_id,
     })
     .collect();
@@ -73,7 +75,7 @@ pub fn insert_channel(channel: &mut FeedChannel) {
   channel.id = result.id;
 }
 
-pub fn get_channel(id: &i32) -> FeedChannel {
+pub fn get_channel(id: i32) -> FeedChannel {
   let connection = establish_connection();
   feed_channels
     .find(id)
@@ -81,7 +83,7 @@ pub fn get_channel(id: &i32) -> FeedChannel {
     .expect("Error loading feed")
 }
 
-pub fn get_channel_with_items(id: &i32) -> (FeedChannel, Vec<FeedItem>) {
+pub fn get_channel_with_items(id: i32) -> (FeedChannel, Vec<FeedItem>) {
   let connection = establish_connection();
   let channel = get_channel(id);
   let items = FeedItem::belonging_to(&channel)

@@ -7,7 +7,7 @@ authors = ["richard <richard@radagast.nu>"]
 actix = "0.5.6"
 actix-web = "0.6.4"
 askama = "0.6.4"
-chrono = "*"
+chrono = "0.4.2"
 diesel = { version = "1.2.2", features = ["postgres", "chrono"] }
 dotenv = "0.11.0"
 env_logger = "0.5.10"
