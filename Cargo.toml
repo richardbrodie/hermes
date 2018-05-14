@@ -1,0 +1,18 @@
+[package]
+name = "feeds"
+version = "0.1.0"
+authors = ["richard <richard@radagast.nu>"]
+
+[dependencies]
+actix = "0.5.6"
+actix-web = "0.6.4"
+askama = "0.6.4"
+chrono = "*"
+diesel = { version = "1.2.2", features = ["postgres", "chrono"] }
+dotenv = "0.11.0"
+env_logger = "0.5.10"
+futures = "0.1.6"
+hyper = "0.11.26"
+reqwest = "0.8.5"
+rss = { version = "1.5.0" }
+tokio-core = "0.1.17"
