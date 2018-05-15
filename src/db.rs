@@ -75,22 +75,30 @@ pub fn insert_channel(channel: &mut FeedChannel) {
   channel.id = result.id;
 }
 
-pub fn get_channel(id: i32) -> FeedChannel {
+pub fn get_channel(id: i32) -> Option<FeedChannel> {
   let connection = establish_connection();
-  feed_channels
-    .find(id)
-    .first::<FeedChannel>(&connection)
-    .expect("Error loading feed")
+  match feed_channels.find(id).first::<FeedChannel>(&connection) {
+    Ok(feed) => Some(feed),
+    Err(_) => {
+      // log error
+      None
+    }
+  }
 }
 
-pub fn get_channel_with_items(id: i32) -> (FeedChannel, Vec<FeedItem>) {
+pub fn get_channel_with_items(id: i32) -> Option<(FeedChannel, Vec<FeedItem>)> {
   let connection = establish_connection();
-  let channel = get_channel(id);
-  let items = FeedItem::belonging_to(&channel)
-    .order(feed_items::published_at.desc())
-    .load::<FeedItem>(&connection)
-    .expect("Error loading feeds");
-  (channel, items)
+  let res = get_channel(id);
+  match res {
+    Some(channel) => {
+      let items = FeedItem::belonging_to(&channel)
+        .order(feed_items::published_at.desc())
+        .load::<FeedItem>(&connection)
+        .expect("Error loading feeds");
+      Some((channel, items))
+    }
+    None => None,
+  }
 }
 
 pub fn get_channels() -> Vec<FeedChannel> {

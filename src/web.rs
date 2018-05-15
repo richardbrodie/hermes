@@ -19,16 +19,21 @@ fn index(_query: Query<HashMap<String, String>>) -> Result<HttpResponse> {
       .body(feed.render().unwrap()),
   )
 }
-fn show_channel(req: HttpRequest) -> HttpResponse {
+fn show_channel(req: HttpRequest) -> Result<HttpResponse> {
   let idstr = req.match_info().get("id").unwrap();
   let id = idstr.parse::<i32>().unwrap();
 
-  let data = get_channel_with_items(id);
-  let feed = FeedChannelTemplate::new(&data);
-
-  HttpResponse::Ok()
-    .content_type("text/html")
-    .body(feed.render().unwrap())
+  match get_channel_with_items(id) {
+    Some(data) => {
+      let feed = FeedChannelTemplate::new(&data);
+      Ok(
+        HttpResponse::Ok()
+          .content_type("text/html")
+          .body(feed.render().unwrap()),
+      )
+    }
+    None => Ok(HttpResponse::NotFound().finish()),
+  }
 }
 
 pub fn start_web() {
