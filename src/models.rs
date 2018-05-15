@@ -1,4 +1,4 @@
-use chrono::{DateTime, FixedOffset, NaiveDateTime, TimeZone, Utc};
+use chrono::NaiveDateTime;
 
 use schema::{feed_channels, feed_items};
 

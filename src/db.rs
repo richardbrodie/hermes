@@ -1,4 +1,4 @@
-use chrono::{DateTime, FixedOffset, NaiveDateTime, TimeZone, Utc};
+use chrono::NaiveDateTime;
 use diesel;
 use diesel::prelude::*;
 use dotenv::dotenv;

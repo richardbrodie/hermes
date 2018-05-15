@@ -1,7 +1,10 @@
-use chrono::{DateTime, FixedOffset, NaiveDateTime, TimeZone, Utc};
-use reqwest;
+use chrono::{DateTime, FixedOffset, Utc};
+use futures::{Future, Stream};
+use hyper::{Client, Error};
 use rss::{Channel, Item};
 use std::io::BufReader;
+use std::str;
+use tokio_core::reactor::Core;
 
 use db::{insert_channel, insert_items};
 use models::{FeedChannel, FeedItem};
@@ -24,11 +27,18 @@ pub fn refresh_feed(channel: &FeedChannel) {
   process_items(feed.items(), channel.id);
 }
 
-pub fn fetch_feed(url: &str) -> Result<Channel, reqwest::Error> {
-  let body = reqwest::get(url)?;
-  let mut channel = Channel::read_from(BufReader::new(body)).unwrap();
-  // channel.set_items(vec![Item::default()]);
-  Ok(channel)
+pub fn fetch_feed(uri: &str) -> Result<Channel, Error> {
+  let mut core = Core::new()?;
+  let client = Client::new(&core.handle());
+
+  let work = client.get(uri.parse()?).and_then(|res| {
+    res.body().concat2().and_then(move |body| {
+      let s = Channel::read_from(BufReader::new(&body as &[u8])).unwrap();
+      Ok(s)
+    })
+  });
+  let res = core.run(work)?;
+  Ok(res)
 }
 
 fn process_items(feed_items: &[Item], channel_id: i32) {

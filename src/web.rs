@@ -1,8 +1,7 @@
 use actix;
-use actix_web::http::{header, Method, StatusCode};
-use actix_web::middleware::session::{self, CookieSessionBackend, RequestSession, SessionStorage};
-use actix_web::{error, fs, middleware, pred, server, App, Error, HttpRequest, HttpResponse, Query,
-                Result};
+use actix_web::http::{Method, StatusCode};
+use actix_web::middleware::session::{self, CookieSessionBackend, SessionStorage};
+use actix_web::{fs, middleware, pred, server, App, HttpRequest, HttpResponse, Query, Result};
 use std::collections::HashMap;
 
 use askama::Template;

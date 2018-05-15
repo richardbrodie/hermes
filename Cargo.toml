@@ -11,8 +11,7 @@ chrono = "0.4.2"
 diesel = { version = "1.2.2", features = ["postgres", "chrono"] }
 dotenv = "0.11.0"
 env_logger = "0.5.10"
-futures = "0.1.6"
+futures = "0.1.21"
 hyper = "0.11.26"
-reqwest = "0.8.5"
-rss = { version = "1.5.0" }
+rss = "1.5.0"
 tokio-core = "0.1.17"
