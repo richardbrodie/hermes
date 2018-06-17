@@ -1,2 +1,7 @@
-{% extends "base.html" %} {% block content %} {% for channel in channels %} {% include "partials/_channel.html" %} {% endfor
-%} {% endblock %}
+{% extends "base.html" %} {% block content %} {% for channel in channels %}
+<h2>
+  <a href="/feed/{{ channel.id }}">{{ channel.title }}</a>
+</h2>
+<p>{{ channel.site_link }}</p>
+<p>{{ channel.description }}</p>
+{% endfor %} {% endblock %}

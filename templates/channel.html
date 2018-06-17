@@ -1,2 +1,6 @@
-{% extends "base.html" %} {% block content %} {% include "partials/_channel.html" %} {% for item in items %} {% include "partials/_item.html"
-%} {% endfor %} {% endblock %}
+{% extends "base.html" %} {% block content %}
+<h2>
+  <a href="{{ channel.site_link }}">{{ channel.title }}</a>
+</h2>
+<p>{{ channel.description }}</p>
+{% for item in items %} {% include "partials/_item.html" %} {% endfor %} {% endblock %}
