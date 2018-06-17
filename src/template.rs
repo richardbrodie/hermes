@@ -37,3 +37,18 @@ impl<'a> FeedChannelTemplate<'a> {
     }
   }
 }
+
+#[derive(Template)]
+#[template(path = "item.html")]
+pub struct FeedItemTemplate<'a> {
+  pub _parent: BaseTemplate,
+  pub item: &'a FeedItem,
+}
+impl<'a> FeedItemTemplate<'a> {
+  pub fn new(item: &'a FeedItem) -> FeedItemTemplate<'a> {
+    FeedItemTemplate {
+      _parent: BaseTemplate {},
+      item: item,
+    }
+  }
+}

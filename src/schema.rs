@@ -2,7 +2,8 @@ table! {
     feed_channels (id) {
         id -> Int4,
         title -> Varchar,
-        link -> Varchar,
+        site_link -> Varchar,
+        feed_link -> Varchar,
         description -> Text,
         updated_at -> Timestamp,
     }

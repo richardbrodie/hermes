@@ -18,7 +18,8 @@ pub struct FeedItem {
 pub struct FeedChannel {
   pub id: i32,
   pub title: String,
-  pub link: String,
+  pub site_link: String,
+  pub feed_link: String,
   pub description: String,
   pub updated_at: NaiveDateTime,
 }
