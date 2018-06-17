@@ -1,74 +1,179 @@
-use actix;
-use actix_web::http::{Method, StatusCode};
-use actix_web::middleware::session::{self, CookieSessionBackend, SessionStorage};
-use actix_web::{fs, middleware, pred, server, App, HttpRequest, HttpResponse, Query, Result};
-use std::collections::HashMap;
-
 use askama::Template;
-use db::{get_channel_with_items, get_channels};
-use template::{FeedChannelTemplate, IndexTemplate};
+use futures::{future, Future, Stream};
+use hyper::rt;
+use hyper::service::service_fn;
+use hyper::{Body, Error, Method, Request, Response, Server, StatusCode};
+use regex::Regex;
+use std::collections::HashMap;
+use std::{path, str};
+use tokio_fs;
+use tokio_io;
+use url::form_urlencoded;
 
-fn index(_query: Query<HashMap<String, String>>) -> Result<HttpResponse> {
-  let channels = get_channels();
-  let feed = IndexTemplate::new(&channels);
+use db::{get_channel_with_items, get_channels, get_item};
+use feed;
+use template::{FeedChannelTemplate, FeedItemTemplate, IndexTemplate};
 
-  Ok(
-    HttpResponse::Ok()
-      .content_type("text/html")
-      .body(feed.render().unwrap()),
-  )
+pub type ResponseFuture = Box<Future<Item = Response<Body>, Error = Error> + Send>;
+
+pub fn start_web() {
+  let addr = "127.0.0.1:3000".parse().unwrap();
+  let server = Server::bind(&addr)
+    .serve(|| service_fn(router))
+    .map_err(|e| eprintln!("server error: {}", e));
+
+  info!("server running on {:?}", addr);
+  rt::spawn(server);
 }
-fn show_channel(req: HttpRequest) -> Result<HttpResponse> {
-  let idstr = req.match_info().get("id").unwrap();
-  let id = idstr.parse::<i32>().unwrap();
 
-  match get_channel_with_items(id) {
-    Some(data) => {
-      let feed = FeedChannelTemplate::new(&data);
-      Ok(
-        HttpResponse::Ok()
-          .content_type("text/html")
-          .body(feed.render().unwrap()),
-      )
-    }
-    None => Ok(HttpResponse::NotFound().finish()),
+fn router(req: Request<Body>) -> ResponseFuture {
+  let p = req.uri().to_owned();
+  match (req.method(), p.path()) {
+    (&Method::GET, "/") | (&Method::GET, "/feeds") => index(),
+    (&Method::GET, r) if r.starts_with("/dist/") => show_asset(r),
+    (&Method::GET, r) if r.starts_with("/feed/") => show_channel(r),
+    (&Method::GET, r) if r.starts_with("/post/") => show_post(r),
+    (&Method::POST, "/add_feed") => add_feed(req.into_body()),
+    _ => Box::new(future::ok(
+      Response::builder()
+        .status(StatusCode::NOT_FOUND)
+        .body(Body::empty())
+        .unwrap(),
+    )),
   }
 }
 
-pub fn start_web() {
-  let sys = actix::System::new("basic-example");
-  let addr = server::new(
-        || App::new()
-            // enable logger
-            .middleware(middleware::Logger::default())
-            // cookie session middleware
-            .middleware(SessionStorage::new(
-                CookieSessionBackend::signed(&[0; 32]).secure(false)
-            ))
-            // static files
-            .handler("/dist", fs::StaticFiles::new("dist"))
-            // redirect
-            .resource("/", |r| r.method(Method::GET).with(index))
-            .resource("/feed/{id}", |r| r.method(Method::GET).f(show_channel))
-            // default
-            .default_resource(|r| {
-                // 404 for GET request
-                r.method(Method::GET).f(p404);
+fn add_feed(body: Body) -> ResponseFuture {
+  let reversed = body.concat2().map(move |chunk| {
+    let params = form_urlencoded::parse(chunk.as_ref())
+      .into_owned()
+      .collect::<HashMap<String, String>>();
 
-                // all requests that are not `GET`
-                r.route().filter(pred::Not(pred::Get())).f(
-                    |req| HttpResponse::MethodNotAllowed());
-            }))
-
-        .bind("127.0.0.1:8080").expect("Can not bind to 127.0.0.1:8080")
-        .shutdown_timeout(0)    // <- Set shutdown timeout to 0 seconds (default 60s)
-        .start();
-
-  println!("Starting http server: 127.0.0.1:8080");
-  let _ = sys.run();
+    match params.get("feed_url") {
+      Some(n) => {
+        info!("feed: {:?}", n);
+        feed::add_feed(n.to_owned());
+        Response::new(Body::empty())
+      }
+      None => Response::builder()
+        .status(StatusCode::BAD_REQUEST)
+        .body(Body::from("parameter 'feed_url' missing"))
+        .unwrap(),
+    }
+  });
+  Box::new(reversed)
 }
 
-/// 404 handler
-fn p404(req: HttpRequest) -> Result<fs::NamedFile> {
-  Ok(fs::NamedFile::open("static/404.html")?.set_status_code(StatusCode::NOT_FOUND))
+fn index() -> ResponseFuture {
+  let channels = get_channels();
+  let feed = IndexTemplate::new(&channels);
+  let res = match feed.render() {
+    Ok(feed_content) => Response::new(Body::from(feed_content)),
+    Err(_) => Response::builder()
+      .status(StatusCode::NOT_FOUND)
+      .body(Body::empty())
+      .unwrap(),
+  };
+  Box::new(future::ok(res))
+  // Box::new(future::ok(Response::new(Body::from("hello world"))))
+}
+
+fn show_channel(req_path: &str) -> ResponseFuture {
+  let re = Regex::new(r"/feed/(\d+)").unwrap();
+  let ch_id = match re.captures(req_path) {
+    Some(d) => d.get(1).unwrap().as_str(),
+    None => {
+      info!("no match: {}", req_path);
+      return Box::new(future::ok(Response::new(Body::empty())));
+    }
+  };
+
+  match get_channel_with_items(ch_id.parse::<i32>().unwrap()) {
+    Some(data) => {
+      let feed = FeedChannelTemplate::new(&data);
+      let feed_html = feed.render().unwrap();
+      Box::new(future::ok(
+        Response::builder().body(Body::from(feed_html)).unwrap(),
+      ))
+    }
+    None => {
+      info!("not found!");
+      Box::new(future::ok(
+        Response::builder()
+          .status(StatusCode::NOT_FOUND)
+          .body("Not found".into())
+          .unwrap(),
+      ))
+    }
+  }
+}
+
+fn show_post(req_path: &str) -> ResponseFuture {
+  let re = Regex::new(r"/post/(\d+)").unwrap();
+  let ch_id = match re.captures(req_path) {
+    Some(d) => d.get(1).unwrap().as_str(),
+    None => {
+      info!("no match: {}", req_path);
+      return Box::new(future::ok(Response::new(Body::empty())));
+    }
+  };
+
+  match get_item(ch_id.parse::<i32>().unwrap()) {
+    Some(data) => {
+      let feed = FeedItemTemplate::new(&data);
+      let feed_html = feed.render().unwrap();
+      Box::new(future::ok(
+        Response::builder().body(Body::from(feed_html)).unwrap(),
+      ))
+    }
+    None => {
+      info!("not found!");
+      Box::new(future::ok(
+        Response::builder()
+          .status(StatusCode::NOT_FOUND)
+          .body("Not found".into())
+          .unwrap(),
+      ))
+    }
+  }
+}
+
+fn show_asset(req_path: &str) -> ResponseFuture {
+  let re = Regex::new(r"/dist/(.+)").unwrap();
+  let d = match re.captures(req_path) {
+    Some(d) => d.get(1).unwrap().as_str(),
+    None => {
+      info!("no param match");
+      return Box::new(future::ok(Response::new(Body::empty())));
+    }
+  };
+
+  let f = path::Path::new("dist").join(d);
+  info!("serving asset: {:?}", f.file_name());
+
+  Box::new(
+    tokio_fs::file::File::open(f)
+      .and_then(|file| {
+        let buf: Vec<u8> = Vec::new();
+        tokio_io::io::read_to_end(file, buf)
+          .and_then(|item| Ok(Response::new(item.1.into())))
+          .or_else(|_| {
+            Ok(
+              Response::builder()
+                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                .body(Body::empty())
+                .unwrap(),
+            )
+          })
+      })
+      .or_else(|_| {
+        info!("not found!");
+        Ok(
+          Response::builder()
+            .status(StatusCode::NOT_FOUND)
+            .body("Not found".into())
+            .unwrap(),
+        )
+      }),
+  )
 }

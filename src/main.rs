@@ -1,18 +1,25 @@
-// #![allow(unused)]
+#![allow(unused)]
 #[macro_use]
 extern crate diesel;
-extern crate actix;
-extern crate actix_web;
 extern crate chrono;
 #[macro_use]
 extern crate askama;
 extern crate dotenv;
-extern crate env_logger;
+#[macro_use]
+extern crate log;
 extern crate futures;
 extern crate hyper;
+extern crate num_cpus;
+extern crate pretty_env_logger;
+extern crate regex;
 extern crate rss;
-extern crate tokio_core;
+extern crate serde_json;
+extern crate tokio;
+extern crate tokio_fs;
+extern crate tokio_io;
+extern crate url;
 
+use hyper::rt;
 use std::env;
 
 mod db;
@@ -22,19 +29,16 @@ mod schema;
 mod template;
 mod web;
 
-// use db::{get_channels, insert_channel};
-use feed::add_feed;
-// use template::{BaseTemplate, FeedChannelTemplate};
+use feed::start_feed_loop;
 use web::start_web;
 
 fn main() {
-  env::set_var("RUST_LOG", "actix_web=debug");
-  env::set_var("RUST_BACKTRACE", "1");
-  env_logger::init();
+  env::set_var("RUST_LOG", "feeds=debug");
+  pretty_env_logger::init();
 
-  // let url = "http://lorem-rss.herokuapp.com/feed";
-  // let url = "https://www.anandtech.com/rss/";
-  let url = "http://feeds.arstechnica.com/arstechnica/index";
-  // add_feed(&url);
-  start_web();
+  rt::run(rt::lazy(|| {
+    start_web();
+    start_feed_loop();
+    Ok(())
+  }));
 }
