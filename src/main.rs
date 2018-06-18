@@ -38,7 +38,7 @@ fn main() {
 
   rt::run(rt::lazy(|| {
     start_web();
-    start_feed_loop();
+    // start_feed_loop();
     Ok(())
   }));
 }
