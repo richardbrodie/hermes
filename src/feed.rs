@@ -9,13 +9,13 @@ use tokio::prelude::*;
 use tokio::timer::Interval;
 
 use db::{
-  channel_exists, get_channel, get_channel_urls, get_channels, get_latest_item_date,
-  insert_channel, insert_items,
+  channel_exists, find_duplicates, get_channel, get_channel_urls, get_channels,
+  get_latest_item_date, insert_channel, insert_items, update_item,
 };
 use models::{FeedChannel, FeedItem};
 
 pub fn start_feed_loop() {
-  let task = Interval::new(Instant::now(), Duration::from_secs(60))
+  let task = Interval::new(Instant::now(), Duration::from_secs(300))
     .for_each(|_| {
       get_channel_urls().into_iter().for_each(|c| {
         update_feed(c.0, c.1);
@@ -66,12 +66,26 @@ pub fn update_feed(channel_id: i32, channel_url: String) {
       Ok(items)
     })
     .and_then(move |mut items| {
-      match get_latest_item_date(channel_id) {
-        Some(date) => items.retain(|ref x| x.published_at > date),
+      match find_duplicates(items.iter().map(|x| x.guid.as_str()).collect()) {
+        Some(dupes) => {
+          let guids: Vec<&str> = dupes.iter().map(|x| x.1.as_str()).collect();
+          let (new_items, mut duplicated_items): (Vec<FeedItem>, Vec<FeedItem>) = items
+            .into_iter()
+            .partition(|x| !guids.contains(&x.guid.as_str()));
+          items = new_items;
+          duplicated_items.retain(|d| {
+            let idx = dupes.iter().find(|(x, y, z)| y == &d.guid).unwrap();
+            d.published_at != idx.2
+          });
+          if duplicated_items.len() > 0 {
+            info!("found {} updated stories", duplicated_items.len());
+            duplicated_items.into_iter().for_each(|d| update_item(&d));
+          }
+        }
         None => (),
-      };
-      info!("found {} new items", items.len());
+      }
       if items.len() > 0 {
+        info!("found {} new items", items.len(),);
         insert_items(&items);
       }
       Ok(())

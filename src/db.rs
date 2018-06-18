@@ -29,6 +29,18 @@ pub struct NewItem<'a> {
   published_at: &'a NaiveDateTime,
   feed_channel_id: &'a i32,
 }
+impl<'a> NewItem<'a> {
+  pub fn new(item: &FeedItem) -> NewItem {
+    NewItem {
+      guid: &item.guid,
+      title: &item.title,
+      link: &item.link,
+      description: &item.description,
+      published_at: &item.published_at,
+      feed_channel_id: &item.feed_channel_id,
+    }
+  }
+}
 
 // internal
 
@@ -121,19 +133,7 @@ pub fn get_channel_urls() -> Vec<(i32, String)> {
 pub fn insert_items(items: &Vec<FeedItem>) {
   use schema::feed_items;
   let connection = establish_connection();
-
-  let new_items: Vec<NewItem> = items
-    .iter()
-    .map(|item| NewItem {
-      guid: &item.guid,
-      title: &item.title,
-      link: &item.link,
-      description: &item.description,
-      published_at: &item.published_at,
-      feed_channel_id: &item.feed_channel_id,
-    })
-    .collect();
-
+  let new_items: Vec<NewItem> = items.iter().map(|item| NewItem::new(item)).collect();
   diesel::insert_into(feed_items::table)
     .values(&new_items)
     .execute(&connection)
@@ -145,6 +145,24 @@ pub fn get_item(id: i32) -> Option<FeedItem> {
   match feed_items.find(id).first::<FeedItem>(&connection) {
     Ok(item) => Some(item),
     Err(_) => None,
+  }
+}
+
+pub fn update_item(item: &FeedItem) {
+  let connection = establish_connection();
+  diesel::update(feed_items).set(item);
+}
+
+pub fn find_duplicates(guids: Vec<&str>) -> Option<Vec<(i32, String, NaiveDateTime)>> {
+  let connection = establish_connection();
+  let results = feed_items
+    .filter(guid.eq_any(guids))
+    .select((feed_items::id, feed_items::guid, feed_items::published_at))
+    .load(&connection)
+    .expect("Error loading items");
+  match results.len() {
+    0 => None,
+    _ => Some(results),
   }
 }
 

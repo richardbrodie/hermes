@@ -2,7 +2,7 @@ use chrono::NaiveDateTime;
 
 use schema::{feed_channels, feed_items};
 
-#[derive(Debug, Queryable, Associations, Identifiable)]
+#[derive(Debug, Queryable, Associations, Identifiable, AsChangeset)]
 #[belongs_to(FeedChannel)]
 pub struct FeedItem {
   pub id: i32,
@@ -14,7 +14,7 @@ pub struct FeedItem {
   pub feed_channel_id: i32,
 }
 
-#[derive(Debug, Queryable, Associations, Identifiable)]
+#[derive(Debug, Queryable, Associations, Identifiable, AsChangeset)]
 pub struct FeedChannel {
   pub id: i32,
   pub title: String,

@@ -149,7 +149,6 @@ fn show_asset(req_path: &str) -> ResponseFuture {
   };
 
   let f = path::Path::new("dist").join(d);
-  info!("serving asset: {:?}", f.file_name());
 
   Box::new(
     tokio_fs::file::File::open(f)
