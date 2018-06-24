@@ -4,8 +4,7 @@ version = "0.1.0"
 authors = ["richard <richard@radagast.nu>"]
 
 [dependencies]
-askama = "0.6.4"
-chrono = "0.4.2"
+chrono = { version = "0.4.3", features = ["serde"] }
 diesel = { version = "1.2.2", features = ["postgres", "chrono"] }
 dotenv = "0.11.0"
 error-chain = ""
@@ -16,6 +15,8 @@ num_cpus = ""
 pretty_env_logger = ""
 regex = "1.0.0"
 rss = "1.5.0"
+serde = ""
+serde_derive = ""
 serde_json = ""
 tokio = "0.1"
 tokio-fs = ""

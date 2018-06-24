@@ -19,15 +19,15 @@ pub struct NewChannel<'a> {
   updated_at: &'a NaiveDateTime,
 }
 
-#[derive(Insertable)]
+#[derive(Insertable, AsChangeset)]
 #[table_name = "feed_items"]
 pub struct NewItem<'a> {
-  guid: &'a str,
-  title: &'a str,
-  link: &'a str,
-  description: &'a str,
-  published_at: &'a NaiveDateTime,
-  feed_channel_id: &'a i32,
+  pub guid: &'a str,
+  pub title: &'a str,
+  pub link: &'a str,
+  pub description: &'a str,
+  pub published_at: NaiveDateTime,
+  pub feed_channel_id: &'a i32,
 }
 impl<'a> NewItem<'a> {
   pub fn new(item: &FeedItem) -> NewItem {
@@ -36,7 +36,7 @@ impl<'a> NewItem<'a> {
       title: &item.title,
       link: &item.link,
       description: &item.description,
-      published_at: &item.published_at,
+      published_at: item.published_at,
       feed_channel_id: &item.feed_channel_id,
     }
   }
@@ -110,6 +110,16 @@ pub fn get_channel_with_items(id: i32) -> Option<(FeedChannel, Vec<FeedItem>)> {
   }
 }
 
+pub fn get_items(id: i32) -> Vec<FeedItem> {
+  let connection = establish_connection();
+  let items = feed_items
+    .filter(feed_channel_id.eq(id))
+    .order(feed_items::published_at.desc())
+    .load::<FeedItem>(&connection)
+    .expect("Error loading feeds");
+  items
+}
+
 pub fn get_channels() -> Vec<FeedChannel> {
   let connection = establish_connection();
   let results = feed_channels
@@ -130,12 +140,11 @@ pub fn get_channel_urls() -> Vec<(i32, String)> {
 
 //items
 
-pub fn insert_items(items: &Vec<FeedItem>) {
+pub fn insert_items(items: &Vec<NewItem>) {
   use schema::feed_items;
   let connection = establish_connection();
-  let new_items: Vec<NewItem> = items.iter().map(|item| NewItem::new(item)).collect();
   diesel::insert_into(feed_items::table)
-    .values(&new_items)
+    .values(items)
     .execute(&connection)
     .expect("Error saving new post");
 }
@@ -148,9 +157,9 @@ pub fn get_item(id: i32) -> Option<FeedItem> {
   }
 }
 
-pub fn update_item(item: &FeedItem) {
+pub fn update_item(id: i32, item: &NewItem) {
   let connection = establish_connection();
-  diesel::update(feed_items).set(item);
+  diesel::update(feed_items.find(id)).set(item);
 }
 
 pub fn find_duplicates(guids: Vec<&str>) -> Option<Vec<(i32, String, NaiveDateTime)>> {
