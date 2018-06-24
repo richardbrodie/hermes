@@ -1,9 +1,0 @@
-{% extends "base.html" %} {% block content %} {% for channel in channels %}
-<div class="box">
-  <h3 class="title is-3">
-    <a href="/feed/{{ channel.id }}">{{ channel.title }}</a>
-  </h3>
-  <p>{{ channel.site_link }}</p>
-  <p>{{ channel.description }}</p>
-</div>
-{% endfor %} {% endblock %}

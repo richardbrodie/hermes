@@ -9,6 +9,9 @@ use hyper::{Body, Error, HeaderMap, Method, Request, Response, Server, StatusCod
 use regex::Regex;
 use serde_json;
 use std::collections::HashMap;
+use std::fs::File;
+use std::io;
+use std::io::prelude::*;
 use std::{path, str};
 use tokio_fs;
 use tokio_io;
@@ -32,8 +35,9 @@ pub fn start_web() {
 fn router(req: Request<Body>) -> ResponseFuture {
   let p = req.uri().to_owned();
   match (req.method(), p.path()) {
-    (&Method::GET, "/") | (&Method::GET, "/feeds") => index(),
-    (&Method::GET, r) if r.starts_with("/dist/") => show_asset(r),
+    (&Method::GET, "/") => home(),
+    (&Method::GET, "/feeds") => index(),
+    (&Method::GET, r) if r.starts_with("/static/") => show_asset(r),
     (&Method::GET, r) if r.starts_with("/feed/") => show_channel(r),
     (&Method::GET, r) if r.starts_with("/item/") => show_item(r),
     (&Method::GET, r) if r.starts_with("/items/") => show_items(r),
@@ -70,6 +74,18 @@ fn add_feed(body: Body) -> ResponseFuture {
     }
   });
   Box::new(reversed)
+}
+
+fn home() -> ResponseFuture {
+  let mut f = File::open("vue/dist/index.html").unwrap();
+  let mut buffer = String::new();
+  f.read_to_string(&mut buffer).unwrap();
+  Box::new(future::ok(
+    Response::builder()
+      .header("Access-Control-Allow-Origin", "*")
+      .body(Body::from(buffer))
+      .unwrap(),
+  ))
 }
 
 fn index() -> ResponseFuture {
@@ -172,7 +188,7 @@ fn show_items(req_path: &str) -> ResponseFuture {
 }
 
 fn show_asset(req_path: &str) -> ResponseFuture {
-  let re = Regex::new(r"/dist/(.+)").unwrap();
+  let re = Regex::new(r"/static/(.+)").unwrap();
   let d = match re.captures(req_path) {
     Some(d) => d.get(1).unwrap().as_str(),
     None => {
@@ -181,7 +197,7 @@ fn show_asset(req_path: &str) -> ResponseFuture {
     }
   };
 
-  let f = path::Path::new("dist").join(d);
+  let f = path::Path::new("vue/dist/static").join(d);
 
   Box::new(
     tokio_fs::file::File::open(f)
