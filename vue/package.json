@@ -9,7 +9,9 @@
   "dependencies": {
     "axios": "^0.18.0",
     "vue": "^2.5.16",
-    "vue-router": "^3.0.1"
+    "vue-axios": "^2.1.1",
+    "vue-router": "^3.0.1",
+    "vue-tree-navigation": "^3.0.1"
   },
   "devDependencies": {
     "@vue/cli-plugin-babel": "^3.0.0-beta.15",

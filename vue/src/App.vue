@@ -1,16 +1,19 @@
 <template>
   <div id="app">
-    <index></index>
+    <sidebar></sidebar>
+    <router-view></router-view>
   </div>
 </template>
 
 <script>
-import Index from "./components/Index";
+import Sidebar from "./components/Sidebar";
+import FeedItems from "./components/FeedItems";
 
 export default {
   name: "App",
   components: {
-    Index
+    Sidebar,
+    FeedItems
   }
 };
 </script>
@@ -22,15 +25,5 @@ export default {
   -moz-osx-font-smoothing: grayscale;
   text-align: left;
   color: #2c3e50;
-}
-#nav {
-  padding: 30px;
-  a {
-    font-weight: bold;
-    color: #2c3e50;
-    &.router-link-exact-active {
-      color: #42b983;
-    }
-  }
 }
 </style>

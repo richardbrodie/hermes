@@ -1,26 +1,25 @@
 <template>
   <div>
-    <div v-for="feed in feeds" v-bind:key='feed.id'>
-      <feed-channel v-bind:feed="feed"></feed-channel>
-    </div>
+    <table>
+      <tbody v-for="feed in feeds" v-bind:key='feed.id'>
+        <tr>
+          <td><router-link :to="{ path: '/feed/'+feed.id }">{{ feed.title }}</router-link></td>
+          <td></td>
+        </tr>
+      </tbody>
+    </table>
   </div>
 </template>
 
-<script type = "text/javascript" >
-import FeedChannel from "./FeedChannel";
-import axios from "axios";
-
+<script>
 export default {
-  components: {
-    FeedChannel
-  },
   data() {
     return {
       feeds: []
     };
   },
   mounted() {
-    axios("http://localhost:3000/feeds", {
+    this.axios("http://localhost:3000/feeds", {
       method: "GET",
       crossDomain: true,
       responseType: "json",
