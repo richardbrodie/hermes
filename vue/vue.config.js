@@ -1,4 +1,5 @@
 module.exports = {
-  assetsDir: 'static',
-  productionSourceMap: false
-}
+  assetsDir: "static",
+  productionSourceMap: false,
+  lintOnSave: undefined
+};

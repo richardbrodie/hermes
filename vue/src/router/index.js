@@ -1,13 +1,15 @@
-import Vue from 'vue'
-import Router from 'vue-router'
-import FeedItems from '@/components/FeedItems'
+import Vue from "vue";
+import Router from "vue-router";
+import FeedItems from "@/components/FeedItems";
 
-Vue.use(Router)
+Vue.use(Router);
 
 export default new Router({
-  routes: [{
-    path: '/feed/:id',
-    name: 'FeedItems',
-    component: FeedItems
-  }]
-})
+  routes: [
+    {
+      path: "/feed/:id",
+      name: "FeedItems",
+      component: FeedItems
+    }
+  ]
+});

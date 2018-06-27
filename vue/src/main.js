@@ -1,18 +1,21 @@
-import Vue from 'vue'
-import VueRouter from 'vue-router'
-Vue.use(VueRouter)
+import Vue from "vue";
+import VueRouter from "vue-router";
+Vue.use(VueRouter);
 
-import axios from 'axios'
-import VueAxios from 'vue-axios'
+import axios from "axios";
+import VueAxios from "vue-axios";
 Vue.use(VueAxios, axios);
 
-import App from './App.vue'
+import VueTreeNavigation from "vue-tree-navigation";
+Vue.use(VueTreeNavigation);
 
-import router from './router'
+import App from "./App.vue";
+
+import router from "./router";
 
 new Vue({
   render: h => h(App),
   router
-}).$mount('#app')
+}).$mount("#app");
 
-Vue.config.productionTip = false
+Vue.config.productionTip = false;

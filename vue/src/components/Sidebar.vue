@@ -1,13 +1,6 @@
 <template>
-  <div>
-    <table>
-      <tbody v-for="feed in feeds" v-bind:key='feed.id'>
-        <tr>
-          <td><router-link :to="{ path: '/feed/'+feed.id }">{{ feed.title }}</router-link></td>
-          <td></td>
-        </tr>
-      </tbody>
-    </table>
+  <div id='sidebar'>
+    <vue-tree-navigation :items='items' />
   </div>
 </template>
 
@@ -15,21 +8,41 @@
 export default {
   data() {
     return {
-      feeds: []
+      items: []
     };
   },
-  mounted() {
+  created() {
     this.axios("http://localhost:3000/feeds", {
       method: "GET",
       crossDomain: true,
       responseType: "json",
       responseEncoding: "utf8"
     }).then(response => {
-      this.feeds = response.data;
+      response.data.forEach(e =>
+        this.items.push({ name: e.title, route: "/feed/" + e.id })
+      );
     });
   }
 };
 </script>
 
 <style>
+a {
+  color: white;
+  text-decoration: none;
+  outline: 0;
+}
+#sidebar {
+  background: #2a2b2f;
+  color: white;
+}
+.NavigationItem {
+}
+.NavigationItem--active {
+  background-color: rgba(255, 255, 255, 0.15);
+  margin-left: -17px;
+  padding-left: 17px;
+  margin-right: -23px;
+  padding-right: 23px;
+}
 </style>
