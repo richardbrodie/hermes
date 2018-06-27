@@ -12,6 +12,7 @@ pub struct FeedItem {
   pub description: String,
   pub published_at: NaiveDateTime,
   pub feed_channel_id: i32,
+  pub content: Option<String>,
 }
 
 #[derive(Debug, Queryable, Associations, Identifiable, Serialize)]

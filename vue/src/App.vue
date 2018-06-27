@@ -6,11 +6,11 @@
 </template>
 
 <script>
-import Sidebar from "./components/Sidebar";
-import FeedItems from "./components/FeedItems";
+import Sidebar from './components/Sidebar';
+import FeedItems from './components/FeedItems';
 
 export default {
-  name: "App",
+  name: 'App',
   components: {
     Sidebar,
     FeedItems

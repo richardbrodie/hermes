@@ -18,12 +18,10 @@ table! {
         description -> Text,
         published_at -> Timestamp,
         feed_channel_id -> Int4,
+        content -> Nullable<Text>,
     }
 }
 
 joinable!(feed_items -> feed_channels (feed_channel_id));
 
-allow_tables_to_appear_in_same_query!(
-    feed_channels,
-    feed_items,
-);
+allow_tables_to_appear_in_same_query!(feed_channels, feed_items,);

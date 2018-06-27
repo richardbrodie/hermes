@@ -104,6 +104,7 @@ fn process_items<'a>(feed_items: &'a [Item], channel_id: &'a i32) -> Vec<NewItem
         .unwrap()
         .naive_local(),
       feed_channel_id: channel_id,
+      content: item.content(),
     })
     .collect();
   items

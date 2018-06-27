@@ -12,14 +12,14 @@ export default {
     };
   },
   created() {
-    this.axios("http://localhost:3000/feeds", {
-      method: "GET",
+    this.axios('http://localhost:3000/feeds', {
+      method: 'GET',
       crossDomain: true,
-      responseType: "json",
-      responseEncoding: "utf8"
+      responseType: 'json',
+      responseEncoding: 'utf8'
     }).then(response => {
       response.data.forEach(e =>
-        this.items.push({ name: e.title, route: "/feed/" + e.id })
+        this.items.push({ name: e.title, route: '/feed/' + e.id })
       );
     });
   }
@@ -36,8 +36,8 @@ a {
   background: #2a2b2f;
   color: white;
 }
-.NavigationItem {
-}
+/* .NavigationItem {
+} */
 .NavigationItem--active {
   background-color: rgba(255, 255, 255, 0.15);
   margin-left: -17px;

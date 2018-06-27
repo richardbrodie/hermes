@@ -28,6 +28,7 @@ pub struct NewItem<'a> {
   pub description: &'a str,
   pub published_at: NaiveDateTime,
   pub feed_channel_id: &'a i32,
+  pub content: Option<&'a str>,
 }
 impl<'a> NewItem<'a> {
   pub fn new(item: &FeedItem) -> NewItem {
@@ -38,6 +39,10 @@ impl<'a> NewItem<'a> {
       description: &item.description,
       published_at: item.published_at,
       feed_channel_id: &item.feed_channel_id,
+      content: match &item.content {
+        Some(s) => Some(s),
+        None => None,
+      },
     }
   }
 }

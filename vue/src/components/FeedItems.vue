@@ -10,7 +10,7 @@
   </div>
 </template>
 
-<script type = "text/javascript" >
+<script type = 'text/javascript' >
 export default {
   data() {
     return {
@@ -21,15 +21,15 @@ export default {
     this.fetchData();
   },
   watch: {
-    $route: "fetchData"
+    $route: 'fetchData'
   },
   methods: {
     fetchData() {
-      this.axios("http://localhost:3000/items/" + this.$route.params.id, {
-        method: "GET",
+      this.axios('http://localhost:3000/items/' + this.$route.params.id, {
+        method: 'GET',
         crossDomain: true,
-        responseType: "json",
-        responseEncoding: "utf8"
+        responseType: 'json',
+        responseEncoding: 'utf8'
       }).then(response => {
         this.items = response.data;
       });
