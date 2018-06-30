@@ -6,6 +6,7 @@ use dotenv::dotenv;
 use models::{FeedChannel, FeedItem};
 use schema::feed_channels::dsl::*;
 use schema::feed_items::dsl::*;
+use schema::users::dsl::*;
 use schema::{feed_channels, feed_items};
 use std::env;
 
@@ -49,7 +50,7 @@ impl<'a> NewItem<'a> {
 
 // internal
 
-fn establish_connection() -> PgConnection {
+pub fn establish_connection() -> PgConnection {
   dotenv().ok();
 
   let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
@@ -189,5 +190,33 @@ pub fn get_latest_item_date(channel_id: i32) -> Option<NaiveDateTime> {
   {
     Ok(item) => Some(item.published_at),
     Err(_) => None,
+  }
+}
+
+// users
+
+pub fn check_user(uname: &str, pwd: &str) -> bool {
+  let connection = establish_connection();
+  select(exists(
+    users
+      .filter(username.eq(uname))
+      .filter(password_hash.eq(pwd)),
+  )).get_result(&connection)
+    .unwrap()
+}
+
+#[cfg(test)]
+mod tests {
+  #[test]
+  fn it_works() {
+    use sodiumoxide::crypto::pwhash;
+    let passwd = b"Correct Horse Battery Staple";
+    let pwh = pwhash::pwhash(
+      passwd,
+      pwhash::OPSLIMIT_INTERACTIVE,
+      pwhash::MEMLIMIT_INTERACTIVE,
+    ).unwrap();
+    let pwh_bytes = &pwh[..];
+    let v = pwhash::pwhash_verify(&pwh, "ddsddjdjd".as_bytes());
   }
 }

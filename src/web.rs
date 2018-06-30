@@ -17,7 +17,7 @@ use tokio_fs;
 use tokio_io;
 use url::form_urlencoded;
 
-use db::{get_channel_with_items, get_channels, get_item, get_items};
+use db::{check_user, get_channel_with_items, get_channels, get_item, get_items};
 use feed;
 
 pub type ResponseFuture = Box<Future<Item = Response<Body>, Error = Error> + Send>;
@@ -37,6 +37,7 @@ fn router(req: Request<Body>) -> ResponseFuture {
   match (req.method(), p.path()) {
     (&Method::GET, "/") => home(),
     (&Method::GET, "/feeds") => index(),
+    (&Method::POST, "/authenticate") => authenticate(req.into_body()),
     (&Method::GET, r) if r.starts_with("/static/") => show_asset(r),
     (&Method::GET, r) if r.starts_with("/feed/") => show_channel(r),
     (&Method::GET, r) if r.starts_with("/item/") => show_item(r),
@@ -56,7 +57,7 @@ fn router(req: Request<Body>) -> ResponseFuture {
 }
 
 fn add_feed(body: Body) -> ResponseFuture {
-  let reversed = body.concat2().map(move |chunk| {
+  let response = body.concat2().map(move |chunk| {
     let params = form_urlencoded::parse(chunk.as_ref())
       .into_owned()
       .collect::<HashMap<String, String>>();
@@ -73,7 +74,7 @@ fn add_feed(body: Body) -> ResponseFuture {
         .unwrap(),
     }
   });
-  Box::new(reversed)
+  Box::new(response)
 }
 
 fn home() -> ResponseFuture {
@@ -107,6 +108,29 @@ fn index() -> ResponseFuture {
       .body(body)
       .unwrap(),
   ))
+}
+
+fn authenticate(body: Body) -> ResponseFuture {
+  let response = body.concat2().map(move |chunk| {
+    let params = form_urlencoded::parse(chunk.as_ref())
+      .into_owned()
+      .collect::<HashMap<String, String>>();
+
+    let status = match (params.get("username"), params.get("password")) {
+      (Some(u), Some(p)) => match check_user(&u, &p) {
+        true => StatusCode::OK,
+        false => StatusCode::UNAUTHORIZED,
+      },
+      _ => StatusCode::BAD_REQUEST,
+    };
+
+    Response::builder()
+      .status(status)
+      .body(Body::empty())
+      .unwrap()
+  });
+
+  Box::new(response)
 }
 
 fn show_channel(req_path: &str) -> ResponseFuture {
