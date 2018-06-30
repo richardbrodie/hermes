@@ -18,7 +18,20 @@ rss = "1.5.0"
 serde = ""
 serde_derive = ""
 serde_json = ""
+sodiumoxide = ""
 tokio = "0.1"
 tokio-fs = ""
 tokio-io = ""
 url = ""
+
+[lib]
+name = "feeds_lib"
+path = "src/lib.rs"
+
+[[bin]]
+name = "feeds"
+path = "src/bin.rs"
+
+[[bin]]
+name = "seed"
+path = "src/bin/seed.rs"
