@@ -17,8 +17,9 @@ use tokio_fs;
 use tokio_io;
 use url::form_urlencoded;
 
-use db::{check_user, get_channel_with_items, get_channels, get_item, get_items};
+use db::{get_channel_with_items, get_channels, get_item, get_items};
 use feed;
+use models::User;
 
 pub type ResponseFuture = Box<Future<Item = Response<Body>, Error = Error> + Send>;
 
@@ -117,7 +118,7 @@ fn authenticate(body: Body) -> ResponseFuture {
       .collect::<HashMap<String, String>>();
 
     let status = match (params.get("username"), params.get("password")) {
-      (Some(u), Some(p)) => match check_user(&u, &p) {
+      (Some(u), Some(p)) => match User::check_user(&u, &p) {
         true => StatusCode::OK,
         false => StatusCode::UNAUTHORIZED,
       },

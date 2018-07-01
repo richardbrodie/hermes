@@ -1,22 +1,32 @@
-#![allow(unused)]
+extern crate argon2rs;
 extern crate diesel;
 extern crate feeds_lib;
 
+use argon2rs::defaults::{KIB, LANES, PASSES};
+use argon2rs::verifier::Encoded;
+use argon2rs::{Argon2, Variant};
 use diesel::prelude::*;
+use std::str;
+
 use feeds_lib::db::establish_connection;
-use feeds_lib::feed::add_feed;
 
 fn main() {
-  use feeds_lib::schema::users::dsl::*;
+  dotenv().ok();
+
+  let password = "hunter2";
+  let username = "admin";
+  let password_salt = "mmm, salt";
+
   let connection = establish_connection();
   diesel::delete(users)
     .execute(&connection)
     .expect("Error deleting users");
 
-  diesel::insert_into(users)
-    .values((username.eq("rbrodie"), password_hash.eq("apabepa")))
-    .execute(&connection);
+  let a2 = Argon2::new(PASSES, LANES, KIB, Variant::Argon2i).unwrap();
+  let enc0 = Encoded::new(a2, password.as_bytes(), password_salt.as_bytes(), b"", b"");
+  let pw_hash = String::from_utf8(enc0.to_u8()).unwrap();
 
-  // add_feed("http://feeds.arstechnica.com/arstechnica/index".to_string());
-  // add_feed("http://feeds.bbci.co.uk/news/rss.xml".to_string());
+  diesel::insert_into(users)
+    .values((username.eq(username), password_hash.eq(pw_hash)))
+    .execute(&connection);
 }

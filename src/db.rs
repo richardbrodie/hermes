@@ -3,7 +3,7 @@ use diesel::dsl::exists;
 use diesel::prelude::*;
 use diesel::{self, select};
 use dotenv::dotenv;
-use models::{FeedChannel, FeedItem};
+use models::{FeedChannel, FeedItem, User};
 use schema::feed_channels::dsl::*;
 use schema::feed_items::dsl::*;
 use schema::users::dsl::*;
@@ -195,28 +195,10 @@ pub fn get_latest_item_date(channel_id: i32) -> Option<NaiveDateTime> {
 
 // users
 
-pub fn check_user(uname: &str, pwd: &str) -> bool {
+pub fn get_user(uname: &str) -> Option<User> {
   let connection = establish_connection();
-  select(exists(
-    users
-      .filter(username.eq(uname))
-      .filter(password_hash.eq(pwd)),
-  )).get_result(&connection)
-    .unwrap()
-}
-
-#[cfg(test)]
-mod tests {
-  #[test]
-  fn it_works() {
-    use sodiumoxide::crypto::pwhash;
-    let passwd = b"Correct Horse Battery Staple";
-    let pwh = pwhash::pwhash(
-      passwd,
-      pwhash::OPSLIMIT_INTERACTIVE,
-      pwhash::MEMLIMIT_INTERACTIVE,
-    ).unwrap();
-    let pwh_bytes = &pwh[..];
-    let v = pwhash::pwhash_verify(&pwh, "ddsddjdjd".as_bytes());
+  match users.filter(username.eq(uname)).first::<User>(&connection) {
+    Ok(user) => Some(user),
+    Err(_) => None,
   }
 }
