@@ -1,3 +1,5 @@
+use diesel::prelude::*;
+
 table! {
     feed_channels (id) {
         id -> Int4,
@@ -32,8 +34,4 @@ table! {
 
 joinable!(feed_items -> feed_channels (feed_channel_id));
 
-allow_tables_to_appear_in_same_query!(
-    feed_channels,
-    feed_items,
-    users,
-);
+allow_tables_to_appear_in_same_query!(feed_channels, feed_items, users,);

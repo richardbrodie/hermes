@@ -1,18 +1,18 @@
+use frank_jwt::{decode, encode, Algorithm};
 use futures::{future, Future, Stream};
 use hyper::header::{
   ACCESS_CONTROL_ALLOW_HEADERS, ACCESS_CONTROL_ALLOW_METHODS, ACCESS_CONTROL_ALLOW_ORIGIN,
   ACCESS_CONTROL_EXPOSE_HEADERS, ALLOW,
 };
-use hyper::rt;
 use hyper::service::service_fn;
-use hyper::{Body, Error, HeaderMap, Method, Request, Response, Server, StatusCode};
+use hyper::{rt, Body, Error, HeaderMap, Method, Request, Response, Server, StatusCode};
 use regex::Regex;
 use serde_json;
 use std::collections::HashMap;
 use std::fs::File;
-use std::io;
 use std::io::prelude::*;
-use std::{path, str};
+use std::time::{SystemTime, UNIX_EPOCH};
+use std::{env, io, path, str};
 use tokio_fs;
 use tokio_io;
 use url::form_urlencoded;
@@ -113,22 +113,28 @@ fn index() -> ResponseFuture {
 
 fn authenticate(body: Body) -> ResponseFuture {
   let response = body.concat2().map(move |chunk| {
+    let mut status = StatusCode::UNAUTHORIZED;
+    let mut body = Body::empty();
     let params = form_urlencoded::parse(chunk.as_ref())
       .into_owned()
       .collect::<HashMap<String, String>>();
 
-    let status = match (params.get("username"), params.get("password")) {
-      (Some(u), Some(p)) => match User::check_user(&u, &p) {
-        true => StatusCode::OK,
-        false => StatusCode::UNAUTHORIZED,
-      },
-      _ => StatusCode::BAD_REQUEST,
+    match (params.get("username"), params.get("password")) {
+      (Some(u), Some(p)) => {
+        let jwt = generate_jwt(u).unwrap();
+
+        match User::check_user(&u, &p) {
+          true => {
+            status = StatusCode::OK;
+            body = Body::from(jwt);
+          }
+          _ => (),
+        }
+      }
+      _ => status = StatusCode::BAD_REQUEST,
     };
 
-    Response::builder()
-      .status(status)
-      .body(Body::empty())
-      .unwrap()
+    Response::builder().status(status).body(body).unwrap()
   });
 
   Box::new(response)
@@ -269,4 +275,28 @@ fn cors_headers() -> ResponseFuture {
       .body(Body::empty())
       .unwrap(),
   ))
+}
+
+fn generate_jwt(user: &str) -> Option<String> {
+  let start = SystemTime::now();
+  let since_the_epoch = start
+    .duration_since(UNIX_EPOCH)
+    .expect("Time went backwards");
+
+  let header = json!({
+    "alg": "HS256",
+    "typ": "JWT"
+  });
+  let payload = json!({
+    "iat": since_the_epoch.as_secs(),
+    "name": user,
+  });
+
+  match env::var("JWT_SECRET") {
+    Ok(val) => match encode(header, &val.to_string(), &payload, Algorithm::HS256) {
+      Ok(jwt) => Some(jwt),
+      Err(_) => None,
+    },
+    Err(e) => None,
+  }
 }
