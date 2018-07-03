@@ -120,21 +120,22 @@ fn authenticate(body: Body) -> ResponseFuture {
       .collect::<HashMap<String, String>>();
 
     match (params.get("username"), params.get("password")) {
-      (Some(u), Some(p)) => {
-        let jwt = generate_jwt(u).unwrap();
-
-        match User::check_user(&u, &p) {
-          true => {
-            status = StatusCode::OK;
-            body = Body::from(jwt);
-          }
-          _ => (),
+      (Some(u), Some(p)) => match User::check_user(&u, &p) {
+        true => {
+          status = StatusCode::OK;
+          let jwt = generate_jwt(u).unwrap();
+          body = Body::from(jwt);
         }
-      }
+        _ => (),
+      },
       _ => status = StatusCode::BAD_REQUEST,
     };
 
-    Response::builder().status(status).body(body).unwrap()
+    Response::builder()
+      .header("Access-Control-Allow-Origin", "*")
+      .status(status)
+      .body(body)
+      .unwrap()
   });
 
   Box::new(response)

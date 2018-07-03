@@ -25,7 +25,8 @@ export default {
   },
   methods: {
     fetchData() {
-      this.axios('http://localhost:3000/items/' + this.$route.params.id, {
+      this.axios({
+        url: 'http://localhost:3000/items/' + this.$route.params.id,
         method: 'GET',
         crossDomain: true,
         responseType: 'json',

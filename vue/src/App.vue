@@ -1,19 +1,22 @@
 <template>
   <div id='app'>
-    <sidebar/>
-    <router-view/>
+    <jwt/>
+    <!-- <sidebar/>
+    <router-view/> -->
   </div>
 </template>
 
 <script>
 import Sidebar from './components/Sidebar';
 import FeedItems from './components/FeedItems';
+import Jwt from './components/Jwt';
 
 export default {
   name: 'App',
   components: {
     Sidebar,
-    FeedItems
+    FeedItems,
+    Jwt
   }
 };
 </script>

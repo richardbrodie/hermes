@@ -12,9 +12,9 @@ export default {
     };
   },
   created() {
-    this.axios('http://localhost:3000/feeds', {
+    this.axios({
+      url: 'http://localhost:3000/feeds',
       method: 'GET',
-      crossDomain: true,
       responseType: 'json',
       responseEncoding: 'utf8'
     }).then(response => {
