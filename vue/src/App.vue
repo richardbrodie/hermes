@@ -1,8 +1,8 @@
 <template>
   <div id='app'>
-    <jwt/>
-    <!-- <sidebar/>
-    <router-view/> -->
+    <!-- <jwt/> -->
+    <sidebar/>
+    <router-view/>
   </div>
 </template>
 

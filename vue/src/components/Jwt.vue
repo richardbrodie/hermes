@@ -18,7 +18,7 @@ export default {
       password: 'admin'
     };
     this.axios({
-      url: 'http://localhost:3000/authenticate',
+      url: 'http://localhost:4000/authenticate',
       method: 'POST',
       responseType: 'text',
       data: qs.stringify(data)

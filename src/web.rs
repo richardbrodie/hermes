@@ -1,8 +1,8 @@
 use frank_jwt::{decode, encode, Algorithm};
 use futures::{future, Future, Stream};
 use hyper::header::{
-  ACCESS_CONTROL_ALLOW_HEADERS, ACCESS_CONTROL_ALLOW_METHODS, ACCESS_CONTROL_ALLOW_ORIGIN,
-  ACCESS_CONTROL_EXPOSE_HEADERS, ALLOW,
+  ACCESS_CONTROL_ALLOW_CREDENTIALS, ACCESS_CONTROL_ALLOW_HEADERS, ACCESS_CONTROL_ALLOW_METHODS,
+  ACCESS_CONTROL_ALLOW_ORIGIN, ACCESS_CONTROL_EXPOSE_HEADERS, ALLOW, AUTHORIZATION,
 };
 use hyper::service::service_fn;
 use hyper::{rt, Body, Error, HeaderMap, Method, Request, Response, Server, StatusCode};
@@ -24,7 +24,7 @@ use models::User;
 pub type ResponseFuture = Box<Future<Item = Response<Body>, Error = Error> + Send>;
 
 pub fn start_web() {
-  let addr = "127.0.0.1:3000".parse().unwrap();
+  let addr = "127.0.0.1:4000".parse().unwrap();
   let server = Server::bind(&addr)
     .serve(|| service_fn(router))
     .map_err(|e| eprintln!("server error: {}", e));
@@ -34,25 +34,35 @@ pub fn start_web() {
 }
 
 fn router(req: Request<Body>) -> ResponseFuture {
-  let p = req.uri().to_owned();
-  match (req.method(), p.path()) {
-    (&Method::GET, "/") => home(),
-    (&Method::GET, "/feeds") => index(),
-    (&Method::POST, "/authenticate") => authenticate(req.into_body()),
-    (&Method::GET, r) if r.starts_with("/static/") => show_asset(r),
-    (&Method::GET, r) if r.starts_with("/feed/") => show_channel(r),
-    (&Method::GET, r) if r.starts_with("/item/") => show_item(r),
-    (&Method::GET, r) if r.starts_with("/items/") => show_items(r),
-    (&Method::POST, "/add_feed") => add_feed(req.into_body()),
-    (&Method::OPTIONS, _) => cors_headers(),
-    _ => {
-      info!("rejected {} {}", req.method(), p.path());
-      Box::new(future::ok(
-        Response::builder()
-          .status(StatusCode::NOT_FOUND)
-          .body(Body::empty())
-          .unwrap(),
-      ))
+  let u = req.uri().to_owned();
+  let path = u.path();
+
+  if req.method() == &Method::OPTIONS {
+    cors_headers()
+  } else if req.method() == &Method::POST && path == "/authenticate" {
+    authenticate(req.into_body())
+  } else {
+    let username = match req.headers().get(AUTHORIZATION) {
+      Some(jwt) => {
+        let (header, payload) = decode(
+          &String::from(jwt.to_str().unwrap()),
+          &env::var("JWT_SECRET").unwrap(),
+          Algorithm::HS256,
+        ).unwrap();
+        payload["name"].as_str().unwrap().to_owned()
+      }
+      None => return throw_code(StatusCode::UNAUTHORIZED),
+    };
+    info!("username: {}", username);
+    match (req.method(), path) {
+      (&Method::GET, "/") => home(),
+      (&Method::GET, "/feeds") => index(),
+      (&Method::GET, r) if r.starts_with("/static/") => show_asset(r),
+      (&Method::GET, r) if r.starts_with("/feed/") => show_channel(r),
+      (&Method::GET, r) if r.starts_with("/item/") => show_item(r),
+      (&Method::GET, r) if r.starts_with("/items/") => show_items(r),
+      (&Method::POST, "/add_feed") => add_feed(req.into_body()),
+      _ => throw_code(StatusCode::NOT_FOUND),
     }
   }
 }
@@ -263,10 +273,11 @@ fn cors_headers() -> ResponseFuture {
   Box::new(future::ok(
     Response::builder()
       .header(ACCESS_CONTROL_ALLOW_ORIGIN, "*")
+      .header(ACCESS_CONTROL_ALLOW_CREDENTIALS, "true")
       .header(ACCESS_CONTROL_EXPOSE_HEADERS, "Access-Control-*")
       .header(
         ACCESS_CONTROL_ALLOW_HEADERS,
-        "Access-Control-*, Origin, X-Requested-With, Content-Type, Accept",
+        "Access-Control-*, Origin, X-Requested-With, Content-Type, Accept, Authorization",
       )
       .header(
         ACCESS_CONTROL_ALLOW_METHODS,
@@ -300,4 +311,13 @@ fn generate_jwt(user: &str) -> Option<String> {
     },
     Err(e) => None,
   }
+}
+
+fn throw_code(code: StatusCode) -> ResponseFuture {
+  Box::new(future::ok(
+    Response::builder()
+      .status(code)
+      .body(Body::empty())
+      .unwrap(),
+  ))
 }
