@@ -20,55 +20,40 @@ use url::form_urlencoded;
 use db::{get_channel_with_items, get_channels, get_item, get_items};
 use feed;
 use models::User;
+use router::{RequestFuture, ResponseFuture, Router};
 
-pub type ResponseFuture = Box<Future<Item = Response<Body>, Error = Error> + Send>;
+pub fn router() -> Router {
+  let mut router = Router::build();
+  router
+    .route(Method::GET, "/", home)
+    .route(Method::GET, "/feeds", index)
+    .route(Method::GET, "/static/(.+)", show_asset)
+    .route(Method::GET, r"/feed/(\d+)", show_channel)
+    .route(Method::GET, r"/item/(\d+)", show_item)
+    .route(Method::GET, r"/items/(\d+)", show_items)
+    .route(Method::POST, "/add_feed", add_feed);
+  router
+}
 
 pub fn start_web() {
   let addr = "127.0.0.1:4000".parse().unwrap();
-  let server = Server::bind(&addr)
-    .serve(|| service_fn(router))
-    .map_err(|e| eprintln!("server error: {}", e));
 
-  info!("server running on {:?}", addr);
-  rt::spawn(server);
-}
-
-fn router(req: Request<Body>) -> ResponseFuture {
-  let u = req.uri().to_owned();
-  let path = u.path();
-
-  if req.method() == &Method::OPTIONS {
-    cors_headers()
-  } else if req.method() == &Method::POST && path == "/authenticate" {
-    authenticate(req.into_body())
-  } else {
-    let username = match req.headers().get(AUTHORIZATION) {
-      Some(jwt) => {
-        let (header, payload) = decode(
-          &String::from(jwt.to_str().unwrap()),
-          &env::var("JWT_SECRET").unwrap(),
-          Algorithm::HS256,
-        ).unwrap();
-        payload["name"].as_str().unwrap().to_owned()
-      }
-      None => return throw_code(StatusCode::UNAUTHORIZED),
+  rt::spawn(future::lazy(move || {
+    let service = move || {
+      let router = router();
+      service_fn(move |req| router.parse(req))
     };
-    info!("username: {}", username);
-    match (req.method(), path) {
-      (&Method::GET, "/") => home(),
-      (&Method::GET, "/feeds") => index(),
-      (&Method::GET, r) if r.starts_with("/static/") => show_asset(r),
-      (&Method::GET, r) if r.starts_with("/feed/") => show_channel(r),
-      (&Method::GET, r) if r.starts_with("/item/") => show_item(r),
-      (&Method::GET, r) if r.starts_with("/items/") => show_items(r),
-      (&Method::POST, "/add_feed") => add_feed(req.into_body()),
-      _ => throw_code(StatusCode::NOT_FOUND),
-    }
-  }
+    let server = Server::bind(&addr)
+      .serve(service)
+      .map_err(|e| eprintln!("server error: {}", e));
+
+    info!("server running on {:?}", addr);
+    server
+  }));
 }
 
-fn add_feed(body: Body) -> ResponseFuture {
-  let response = body.concat2().map(move |chunk| {
+fn add_feed(req: Request<Body>) -> ResponseFuture {
+  let response = req.into_body().concat2().map(move |chunk| {
     let params = form_urlencoded::parse(chunk.as_ref())
       .into_owned()
       .collect::<HashMap<String, String>>();
@@ -88,7 +73,7 @@ fn add_feed(body: Body) -> ResponseFuture {
   Box::new(response)
 }
 
-fn home() -> ResponseFuture {
+fn home(req: Request<Body>) -> ResponseFuture {
   let mut f = File::open("vue/dist/index.html").unwrap();
   let mut buffer = String::new();
   f.read_to_string(&mut buffer).unwrap();
@@ -100,7 +85,7 @@ fn home() -> ResponseFuture {
   ))
 }
 
-fn index() -> ResponseFuture {
+fn index(req: Request<Body>) -> ResponseFuture {
   let channels = get_channels();
   let mut body = Body::empty();
   let mut status = StatusCode::OK;
@@ -151,7 +136,8 @@ fn authenticate(body: Body) -> ResponseFuture {
   Box::new(response)
 }
 
-fn show_channel(req_path: &str) -> ResponseFuture {
+fn show_channel(req: Request<Body>) -> ResponseFuture {
+  let req_path = req.uri().path();
   let re = Regex::new(r"/feed/(\d+)").unwrap();
   let ch_id = match re.captures(req_path) {
     Some(d) => d.get(1).unwrap().as_str(),
@@ -177,7 +163,8 @@ fn show_channel(req_path: &str) -> ResponseFuture {
   Box::new(future::ok(content))
 }
 
-fn show_item(req_path: &str) -> ResponseFuture {
+fn show_item(req: Request<Body>) -> ResponseFuture {
+  let req_path = req.uri().path();
   let re = Regex::new(r"/item/(\d+)").unwrap();
   let ch_id = match re.captures(req_path) {
     Some(d) => d.get(1).unwrap().as_str(),
@@ -203,7 +190,8 @@ fn show_item(req_path: &str) -> ResponseFuture {
   Box::new(future::ok(content))
 }
 
-fn show_items(req_path: &str) -> ResponseFuture {
+fn show_items(req: Request<Body>) -> ResponseFuture {
+  let req_path = req.uri().path();
   let re = Regex::new(r"/items/(\d+)").unwrap();
   let ch_id = match re.captures(req_path) {
     Some(d) => d.get(1).unwrap().as_str(),
@@ -229,7 +217,8 @@ fn show_items(req_path: &str) -> ResponseFuture {
   ))
 }
 
-fn show_asset(req_path: &str) -> ResponseFuture {
+fn show_asset(req: Request<Body>) -> ResponseFuture {
+  let req_path = req.uri().path();
   let re = Regex::new(r"/static/(.+)").unwrap();
   let d = match re.captures(req_path) {
     Some(d) => d.get(1).unwrap().as_str(),
@@ -311,13 +300,4 @@ fn generate_jwt(user: &str) -> Option<String> {
     },
     Err(e) => None,
   }
-}
-
-fn throw_code(code: StatusCode) -> ResponseFuture {
-  Box::new(future::ok(
-    Response::builder()
-      .status(code)
-      .body(Body::empty())
-      .unwrap(),
-  ))
 }

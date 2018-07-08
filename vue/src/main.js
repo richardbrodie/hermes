@@ -10,9 +10,6 @@ import axios from 'axios';
 import VueAxios from 'vue-axios';
 Vue.use(VueAxios, axios);
 
-import VueTreeNavigation from 'vue-tree-navigation';
-Vue.use(VueTreeNavigation);
-
 import App from './App.vue';
 import router from './router';
 

@@ -26,5 +26,6 @@ use frank_jwt::{decode, encode, Algorithm};
 pub mod db;
 pub mod feed;
 pub mod models;
+pub mod router;
 pub mod schema;
 pub mod web;
