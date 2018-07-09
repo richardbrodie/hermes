@@ -63,10 +63,15 @@ impl Router {
   }
 
   pub fn throw_code(code: StatusCode) -> ResponseFuture {
+    Router::response(Body::empty(), code)
+  }
+
+  pub fn response(body: Body, status: StatusCode) -> ResponseFuture {
     Box::new(future::ok(
       Response::builder()
-        .status(code)
-        .body(Body::empty())
+        .header("Access-Control-Allow-Origin", "*")
+        .status(status)
+        .body(body)
         .unwrap(),
     ))
   }

@@ -25,6 +25,7 @@ use router::{RequestFuture, ResponseFuture, Router};
 pub fn router() -> Router {
   let mut router = Router::build();
   router
+    .route(Method::OPTIONS, ".*", cors_headers)
     .route(Method::GET, "/", home)
     .route(Method::GET, "/feeds", index)
     .route(Method::GET, "/static/(.+)", show_asset)
@@ -77,90 +78,67 @@ fn home(req: Request<Body>) -> ResponseFuture {
   let mut f = File::open("vue/dist/index.html").unwrap();
   let mut buffer = String::new();
   f.read_to_string(&mut buffer).unwrap();
-  Box::new(future::ok(
-    Response::builder()
-      .header("Access-Control-Allow-Origin", "*")
-      .body(Body::from(buffer))
-      .unwrap(),
-  ))
+  Router::response(Body::from(buffer), StatusCode::OK)
 }
 
 fn index(req: Request<Body>) -> ResponseFuture {
   let channels = get_channels();
   let mut body = Body::empty();
-  let mut status = StatusCode::OK;
+  let mut status = StatusCode::NOT_FOUND;
   match serde_json::to_string(&channels) {
     Ok(json) => {
+      status = StatusCode::OK;
       body = Body::from(json);
     }
-    Err(_) => {
-      status = StatusCode::NOT_FOUND;
-    }
+    Err(_) => (),
   };
-  Box::new(future::ok(
-    Response::builder()
-      .status(status)
-      .header("Access-Control-Allow-Origin", "*")
-      .body(body)
-      .unwrap(),
-  ))
+  Router::response(body, status)
 }
 
-fn authenticate(body: Body) -> ResponseFuture {
-  let response = body.concat2().map(move |chunk| {
-    let mut status = StatusCode::UNAUTHORIZED;
-    let mut body = Body::empty();
-    let params = form_urlencoded::parse(chunk.as_ref())
-      .into_owned()
-      .collect::<HashMap<String, String>>();
+// fn authenticate(req: Request<Body>) -> ResponseFuture {
+//   let mut status = StatusCode::UNAUTHORIZED;
+//   let mut body = Body::empty();
+//   req.into_body().concat2().map(move |chunk| {
+//     let params = form_urlencoded::parse(chunk.as_ref())
+//       .into_owned()
+//       .collect::<HashMap<String, String>>();
 
-    match (params.get("username"), params.get("password")) {
-      (Some(u), Some(p)) => match User::check_user(&u, &p) {
-        true => {
-          status = StatusCode::OK;
-          let jwt = generate_jwt(u).unwrap();
-          body = Body::from(jwt);
-        }
-        _ => (),
-      },
-      _ => status = StatusCode::BAD_REQUEST,
-    };
-
-    Response::builder()
-      .header("Access-Control-Allow-Origin", "*")
-      .status(status)
-      .body(body)
-      .unwrap()
-  });
-
-  Box::new(response)
-}
+//     match (params.get("username"), params.get("password")) {
+//       (Some(u), Some(p)) => match User::check_user(&u, &p) {
+//         true => {
+//           status = StatusCode::OK;
+//           let jwt = generate_jwt(u).unwrap();
+//           body = Body::from(jwt);
+//         }
+//         _ => (),
+//       },
+//       _ => status = StatusCode::BAD_REQUEST,
+//     };
+//   });
+//   Router::response(body, status)
+// }
 
 fn show_channel(req: Request<Body>) -> ResponseFuture {
   let req_path = req.uri().path();
   let re = Regex::new(r"/feed/(\d+)").unwrap();
   let ch_id = match re.captures(req_path) {
     Some(d) => d.get(1).unwrap().as_str(),
-    None => {
-      info!("no match: {}", req_path);
-      return Box::new(future::ok(Response::new(Body::empty())));
-    }
+    None => return Router::response(Body::empty(), StatusCode::NOT_FOUND),
   };
 
-  let content = match get_channel_with_items(ch_id.parse::<i32>().unwrap()) {
+  let mut status = StatusCode::NOT_FOUND;
+  let mut body = Body::empty();
+  match get_channel_with_items(ch_id.parse::<i32>().unwrap()) {
     Some(data) => match serde_json::to_string(&data) {
-      Ok(json) => Response::new(Body::from(json)),
-      Err(_) => Response::builder()
-        .status(StatusCode::NOT_FOUND)
-        .body(Body::empty())
-        .unwrap(),
+      Ok(json) => {
+        body = Body::from(json);
+        status = StatusCode::OK;
+      }
+      Err(_) => (),
     },
-    None => Response::builder()
-      .status(StatusCode::NOT_FOUND)
-      .body(Body::empty())
-      .unwrap(),
+    None => (),
   };
-  Box::new(future::ok(content))
+  Router::response(body, status)
 }
 
 fn show_item(req: Request<Body>) -> ResponseFuture {
@@ -170,24 +148,23 @@ fn show_item(req: Request<Body>) -> ResponseFuture {
     Some(d) => d.get(1).unwrap().as_str(),
     None => {
       info!("no match: {}", req_path);
-      return Box::new(future::ok(Response::new(Body::empty())));
+      return Router::response(Body::empty(), StatusCode::BAD_REQUEST);
     }
   };
 
-  let content = match get_item(ch_id.parse::<i32>().unwrap()) {
+  let mut status = StatusCode::OK;
+  let mut body = Body::empty();
+  match get_item(ch_id.parse::<i32>().unwrap()) {
     Some(data) => match serde_json::to_string(&data) {
-      Ok(json) => Response::new(Body::from(json)),
-      Err(_) => Response::builder()
-        .status(StatusCode::NOT_FOUND)
-        .body(Body::empty())
-        .unwrap(),
+      Ok(json) => {
+        body = Body::from(json);
+        status = StatusCode::OK;
+      }
+      Err(_) => (),
     },
-    None => Response::builder()
-      .status(StatusCode::NOT_FOUND)
-      .body(Body::empty())
-      .unwrap(),
+    None => (),
   };
-  Box::new(future::ok(content))
+  Router::response(body, status)
 }
 
 fn show_items(req: Request<Body>) -> ResponseFuture {
@@ -204,17 +181,11 @@ fn show_items(req: Request<Body>) -> ResponseFuture {
   let mut body = Body::empty();
   let mut status = StatusCode::OK;
   let data = get_items(ch_id.parse::<i32>().unwrap());
-  let content = match serde_json::to_string(&data) {
+  match serde_json::to_string(&data) {
     Ok(json) => body = Body::from(json),
     Err(_) => status = StatusCode::NOT_FOUND,
   };
-  Box::new(future::ok(
-    Response::builder()
-      .status(status)
-      .header("Access-Control-Allow-Origin", "*")
-      .body(body)
-      .unwrap(),
-  ))
+  Router::response(body, status)
 }
 
 fn show_asset(req: Request<Body>) -> ResponseFuture {
@@ -224,7 +195,7 @@ fn show_asset(req: Request<Body>) -> ResponseFuture {
     Some(d) => d.get(1).unwrap().as_str(),
     None => {
       info!("no param match");
-      return Box::new(future::ok(Response::new(Body::empty())));
+      return Router::response(Body::empty(), StatusCode::NOT_FOUND);
     }
   };
 
@@ -250,14 +221,14 @@ fn show_asset(req: Request<Body>) -> ResponseFuture {
         Ok(
           Response::builder()
             .status(StatusCode::NOT_FOUND)
-            .body("Not found".into())
+            .body(Body::empty())
             .unwrap(),
         )
       }),
   )
 }
 
-fn cors_headers() -> ResponseFuture {
+fn cors_headers(_req: Request<Body>) -> ResponseFuture {
   let mut headers = HeaderMap::new();
   Box::new(future::ok(
     Response::builder()
@@ -270,9 +241,9 @@ fn cors_headers() -> ResponseFuture {
       )
       .header(
         ACCESS_CONTROL_ALLOW_METHODS,
-        "GET, POST, PUT, DELETE, OPTIONS, HEAD",
+        "GET, POST, PUT, PATCH, OPTIONS, HEAD",
       )
-      .header(ALLOW, "GET, POST, PUT, DELETE, OPTIONS, HEAD")
+      .header(ALLOW, "GET, POST, PUT, PATCH, OPTIONS, HEAD")
       .body(Body::empty())
       .unwrap(),
   ))

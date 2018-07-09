@@ -1,6 +1,12 @@
 <template>
   <div id='sidebar'>
-    <vue-tree-navigation :items='items' />
+    <div class='feed-item' v-for='item in items' v-bind:key='item.id'>
+      <div class='content'>
+        <div class='title'>{{ item.title }}</div>
+        <div class='desc'>{{ item.description }}</div>
+      </div>
+      <div class='pub_date'>{{ item.published_at }}</div>
+    </div>
   </div>
 </template>
 
