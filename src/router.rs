@@ -6,14 +6,15 @@ use std::fmt;
 pub type RequestFuture = fn(Request<Body>) -> ResponseFuture;
 pub type ResponseFuture = Box<Future<Item = Response<Body>, Error = Error> + Send>;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Route {
   verb: Method,
   route: Regex,
   with: RequestFuture,
+  authenticatable: bool,
 }
 impl Route {
-  pub fn new(verb: Method, route: &str, with: RequestFuture) -> Route {
+  pub fn new(verb: Method, route: &str, with: RequestFuture, auth: bool) -> Route {
     let mut r = route.to_owned();
     if !r.starts_with("^") {
       r = format!("^{}", r);
@@ -27,6 +28,7 @@ impl Route {
       verb: verb,
       route: re,
       with: with,
+      authenticatable: auth,
     }
   }
   pub fn matches(&self, path: &str) -> bool {
@@ -34,18 +36,27 @@ impl Route {
   }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Router {
   routes: Vec<Route>,
+  auth_handler: Option<for<'r> fn(&'r Request<Body>) -> bool>,
 }
 impl Router {
   pub fn build() -> Router {
     let routes = Vec::new();
-    Router { routes: routes }
+    Router {
+      routes: routes,
+      auth_handler: None,
+    }
   }
 
-  pub fn route(&mut self, verb: Method, path: &str, with: RequestFuture) -> &mut Self {
-    let route = Route::new(verb, path, with);
+  pub fn auth_handler(&mut self, handler: fn(&Request<Body>) -> bool) -> &mut Self {
+    self.auth_handler = Some(handler);
+    self
+  }
+
+  pub fn route(&mut self, verb: Method, path: &str, with: RequestFuture, auth: bool) -> &mut Self {
+    let route = Route::new(verb, path, with, auth);
     self.routes.push(route);
     self
   }
@@ -56,9 +67,14 @@ impl Router {
 
     for r in &self.routes {
       if r.matches(path) && &r.verb == req.method() {
+        if r.authenticatable {
+          let authed = (&self.auth_handler.unwrap())(&req);
+          info!("auth: {}", authed);
+        }
         return (r.with)(req);
       }
     }
+
     Router::throw_code(StatusCode::NOT_FOUND)
   }
 

@@ -25,14 +25,16 @@ use router::{RequestFuture, ResponseFuture, Router};
 pub fn router() -> Router {
   let mut router = Router::build();
   router
-    .route(Method::OPTIONS, ".*", cors_headers)
-    .route(Method::GET, "/", home)
-    .route(Method::GET, "/feeds", index)
-    .route(Method::GET, "/static/(.+)", show_asset)
-    .route(Method::GET, r"/feed/(\d+)", show_channel)
-    .route(Method::GET, r"/item/(\d+)", show_item)
-    .route(Method::GET, r"/items/(\d+)", show_items)
-    .route(Method::POST, "/add_feed", add_feed);
+    .auth_handler(check_jwt)
+    .route(Method::OPTIONS, ".*", options_headers, false)
+    .route(Method::GET, "/", home, false)
+    .route(Method::GET, "/feeds", index, true)
+    .route(Method::GET, "/static/(.+)", show_asset, false)
+    .route(Method::GET, r"/feed/(\d+)", show_channel, true)
+    .route(Method::GET, r"/item/(\d+)", show_item, true)
+    .route(Method::GET, r"/items/(\d+)", show_items, true)
+    .route(Method::POST, "/add_feed", add_feed, true)
+    .route(Method::POST, "/authenticate", authenticate, false);
   router
 }
 
@@ -95,28 +97,30 @@ fn index(req: Request<Body>) -> ResponseFuture {
   Router::response(body, status)
 }
 
-// fn authenticate(req: Request<Body>) -> ResponseFuture {
-//   let mut status = StatusCode::UNAUTHORIZED;
-//   let mut body = Body::empty();
-//   req.into_body().concat2().map(move |chunk| {
-//     let params = form_urlencoded::parse(chunk.as_ref())
-//       .into_owned()
-//       .collect::<HashMap<String, String>>();
+fn authenticate(req: Request<Body>) -> ResponseFuture {
+  let response = req.into_body().concat2().map(move |chunk| {
+    let mut status = StatusCode::UNAUTHORIZED;
+    let mut body = Body::empty();
 
-//     match (params.get("username"), params.get("password")) {
-//       (Some(u), Some(p)) => match User::check_user(&u, &p) {
-//         true => {
-//           status = StatusCode::OK;
-//           let jwt = generate_jwt(u).unwrap();
-//           body = Body::from(jwt);
-//         }
-//         _ => (),
-//       },
-//       _ => status = StatusCode::BAD_REQUEST,
-//     };
-//   });
-//   Router::response(body, status)
-// }
+    let params = form_urlencoded::parse(chunk.as_ref())
+      .into_owned()
+      .collect::<HashMap<String, String>>();
+
+    match (params.get("username"), params.get("password")) {
+      (Some(u), Some(p)) => match User::check_user(&u, &p) {
+        true => {
+          status = StatusCode::OK;
+          let jwt = generate_jwt(u).unwrap();
+          body = Body::from(jwt);
+        }
+        _ => (),
+      },
+      _ => status = StatusCode::BAD_REQUEST,
+    };
+    Response::builder().status(status).body(body).unwrap()
+  });
+  Box::new(response)
+}
 
 fn show_channel(req: Request<Body>) -> ResponseFuture {
   let req_path = req.uri().path();
@@ -201,34 +205,33 @@ fn show_asset(req: Request<Body>) -> ResponseFuture {
 
   let f = path::Path::new("vue/dist/static").join(d);
 
-  Box::new(
-    tokio_fs::file::File::open(f)
-      .and_then(|file| {
-        let buf: Vec<u8> = Vec::new();
-        tokio_io::io::read_to_end(file, buf)
-          .and_then(|item| Ok(Response::new(item.1.into())))
-          .or_else(|_| {
-            Ok(
-              Response::builder()
-                .status(StatusCode::INTERNAL_SERVER_ERROR)
-                .body(Body::empty())
-                .unwrap(),
-            )
-          })
-      })
-      .or_else(|_| {
-        info!("not found!");
-        Ok(
-          Response::builder()
-            .status(StatusCode::NOT_FOUND)
-            .body(Body::empty())
-            .unwrap(),
-        )
-      }),
-  )
+  let response = tokio_fs::file::File::open(f)
+    .and_then(|file| {
+      let buf: Vec<u8> = Vec::new();
+      tokio_io::io::read_to_end(file, buf)
+        .and_then(|item| Ok(Response::new(item.1.into())))
+        .or_else(|_| {
+          Ok(
+            Response::builder()
+              .status(StatusCode::INTERNAL_SERVER_ERROR)
+              .body(Body::empty())
+              .unwrap(),
+          )
+        })
+    })
+    .or_else(|_| {
+      info!("not found!");
+      Ok(
+        Response::builder()
+          .status(StatusCode::NOT_FOUND)
+          .body(Body::empty())
+          .unwrap(),
+      )
+    });
+  Box::new(response)
 }
 
-fn cors_headers(_req: Request<Body>) -> ResponseFuture {
+fn options_headers(_req: Request<Body>) -> ResponseFuture {
   let mut headers = HeaderMap::new();
   Box::new(future::ok(
     Response::builder()
@@ -247,6 +250,14 @@ fn cors_headers(_req: Request<Body>) -> ResponseFuture {
       .body(Body::empty())
       .unwrap(),
   ))
+}
+
+fn check_jwt(req: &Request<Body>) -> bool {
+  let map = req.headers();
+  match map.get(AUTHORIZATION) {
+    Some(_header) => true,
+    None => false,
+  }
 }
 
 fn generate_jwt(user: &str) -> Option<String> {
