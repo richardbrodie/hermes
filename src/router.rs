@@ -3,7 +3,8 @@ use hyper::{Body, Error, Method, Request, Response, StatusCode};
 use regex::Regex;
 use std::fmt;
 
-pub type RequestFuture = fn(Request<Body>) -> ResponseFuture;
+pub type AuthenticationHandler = Option<for<'r> fn(&'r Request<Body>) -> Option<String>>;
+pub type RequestFuture = fn(Request<Body>, Option<String>) -> ResponseFuture;
 pub type ResponseFuture = Box<Future<Item = Response<Body>, Error = Error> + Send>;
 
 #[derive(Clone)]
@@ -39,7 +40,7 @@ impl Route {
 #[derive(Clone)]
 pub struct Router {
   routes: Vec<Route>,
-  auth_handler: Option<for<'r> fn(&'r Request<Body>) -> bool>,
+  auth_handler: AuthenticationHandler,
 }
 impl Router {
   pub fn build() -> Router {
@@ -50,7 +51,7 @@ impl Router {
     }
   }
 
-  pub fn auth_handler(&mut self, handler: fn(&Request<Body>) -> bool) -> &mut Self {
+  pub fn auth_handler(&mut self, handler: fn(&Request<Body>) -> Option<String>) -> &mut Self {
     self.auth_handler = Some(handler);
     self
   }
@@ -67,14 +68,17 @@ impl Router {
 
     for r in &self.routes {
       if r.matches(path) && &r.verb == req.method() {
+        let mut username: Option<String> = None;
         if r.authenticatable {
-          let authed = (&self.auth_handler.unwrap())(&req);
-          info!("auth: {}", authed);
+          match (&self.auth_handler.unwrap())(&req) {
+            Some(user) => username = Some(user),
+            None => return Router::throw_code(StatusCode::UNAUTHORIZED),
+          };
         }
-        return (r.with)(req);
+        return (r.with)(req, username);
       }
     }
-
+    info!("not found");
     Router::throw_code(StatusCode::NOT_FOUND)
   }
 

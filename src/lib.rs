@@ -6,9 +6,9 @@ extern crate dotenv;
 #[macro_use]
 extern crate log;
 extern crate argon2rs;
-extern crate frank_jwt;
 extern crate futures;
 extern crate hyper;
+extern crate jsonwebtoken;
 extern crate pretty_env_logger;
 extern crate regex;
 extern crate rss;
@@ -20,8 +20,6 @@ extern crate url;
 extern crate serde_json;
 #[macro_use]
 extern crate serde_derive;
-
-use frank_jwt::{decode, encode, Algorithm};
 
 pub mod db;
 pub mod feed;

@@ -8,9 +8,9 @@ chrono = { version = "0.4.3", features = ["serde"] }
 diesel = { version = "1.2.2", features = ["postgres", "chrono"] }
 dotenv = "0.11.0"
 error-chain = ""
-frank_jwt = ""
 futures = "0.1"
 hyper = "0.12"
+jsonwebtoken = "4"
 log = "0.4.0"
 num_cpus = ""
 pretty_env_logger = ""
