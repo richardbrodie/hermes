@@ -1,5 +1,5 @@
-use argon2rs::verifier::Encoded;
 use chrono::NaiveDateTime;
+use sodiumoxide::crypto::pwhash;
 
 use db::get_user;
 use schema::{feed_channels, feed_items, users};
@@ -42,7 +42,11 @@ impl User {
   }
 
   fn verifies(&self, pass: &str) -> bool {
-    let enc0 = Encoded::from_u8(self.password_hash.as_bytes()).unwrap();
-    enc0.verify(pass.as_bytes())
+    let pwh = pwhash::pwhash(
+      pass.as_bytes(),
+      pwhash::OPSLIMIT_INTERACTIVE,
+      pwhash::MEMLIMIT_INTERACTIVE,
+    ).unwrap();
+    pwhash::pwhash_verify(&pwh, self.password_hash.as_bytes())
   }
 }
