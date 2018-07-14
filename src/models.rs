@@ -31,7 +31,7 @@ pub struct FeedChannel {
 pub struct User {
   pub id: i32,
   pub username: String,
-  pub password_hash: String,
+  pub password_hash: Vec<u8>,
 }
 impl User {
   pub fn check_user(username: &str, pass: &str) -> Option<User> {
@@ -45,12 +45,8 @@ impl User {
   }
 
   fn verifies(&self, pass: &str) -> bool {
-    let pwh = pwhash::pwhash(
-      pass.as_bytes(),
-      pwhash::OPSLIMIT_INTERACTIVE,
-      pwhash::MEMLIMIT_INTERACTIVE,
-    ).unwrap();
-    pwhash::pwhash_verify(&pwh, self.password_hash.as_bytes())
+    let stored_hash = pwhash::HashedPassword::from_slice(&self.password_hash).unwrap();
+    pwhash::pwhash_verify(&stored_hash, pass.as_bytes())
   }
 }
 

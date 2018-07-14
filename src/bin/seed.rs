@@ -22,12 +22,8 @@ fn main() {
     pwhash::OPSLIMIT_INTERACTIVE,
     pwhash::MEMLIMIT_INTERACTIVE,
   ).unwrap();
-  let pwh_bytes = &pwh[..];
-  let pwh_str = from_utf8(pwh_bytes).unwrap();
 
   let res = diesel::insert_into(users)
-    .values((username.eq(userpass), password_hash.eq(pwh_str)))
+    .values((username.eq(userpass), password_hash.eq(&pwh[..])))
     .execute(&connection);
-
-  println!("{:?}", res);
 }
