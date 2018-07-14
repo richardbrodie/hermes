@@ -2,7 +2,7 @@ use chrono::NaiveDateTime;
 use sodiumoxide::crypto::pwhash;
 
 use db::get_user;
-use schema::{feed_channels, feed_items, users};
+use schema::*;
 
 #[derive(Debug, Queryable, Associations, Identifiable, Serialize)]
 #[belongs_to(FeedChannel)]
@@ -34,10 +34,13 @@ pub struct User {
   pub password_hash: String,
 }
 impl User {
-  pub fn check_user(username: &str, pass: &str) -> bool {
+  pub fn check_user(username: &str, pass: &str) -> Option<User> {
     match get_user(username) {
-      Some(user) => user.verifies(pass),
-      None => false,
+      Some(user) => match user.verifies(pass) {
+        true => Some(user),
+        false => None,
+      },
+      None => None,
     }
   }
 
@@ -49,4 +52,10 @@ impl User {
     ).unwrap();
     pwhash::pwhash_verify(&pwh, self.password_hash.as_bytes())
   }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Claims {
+  pub name: String,
+  pub id: i32,
 }

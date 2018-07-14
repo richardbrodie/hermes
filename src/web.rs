@@ -5,36 +5,36 @@ use hyper::header::{
 };
 use hyper::service::service_fn;
 use hyper::{rt, Body, Error, HeaderMap, Method, Request, Response, Server, StatusCode};
-use jsonwebtoken::{decode, encode, Algorithm, Header, Validation};
+use jsonwebtoken::{decode, encode, Header, Validation};
 use regex::Regex;
 use serde_json;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::prelude::*;
 use std::time::{SystemTime, UNIX_EPOCH};
-use std::{env, io, path, str};
+use std::{env, path, str};
 use tokio_fs;
 use tokio_io;
 use url::form_urlencoded;
 
 use db::{get_channel_with_items, get_channels, get_item, get_items};
 use feed;
-use models::User;
-use router::{RequestFuture, ResponseFuture, Router};
+use models::{Claims, User};
+use router::Router;
 
 pub fn router() -> Router {
   let mut router = Router::build();
   router
-    .auth_handler(check_jwt)
-    .route(Method::OPTIONS, ".*", options_headers, false)
-    .route(Method::GET, "/", home, false)
-    .route(Method::GET, "/feeds", index, true)
-    .route(Method::GET, "/static/(.+)", show_asset, false)
-    .route(Method::GET, r"/feed/(\d+)", show_channel, true)
-    .route(Method::GET, r"/item/(\d+)", show_item, true)
-    .route(Method::GET, r"/items/(\d+)", show_items, true)
-    .route(Method::POST, "/add_feed", add_feed, true)
-    .route(Method::POST, "/authenticate", authenticate, false);
+    .auth_handler(decode_jwt)
+    .open_route(Method::OPTIONS, ".*", options_headers)
+    .open_route(Method::GET, "/", home)
+    .open_route(Method::GET, "/static/(.+)", show_asset)
+    .open_route(Method::POST, "/authenticate", authenticate)
+    .closed_route(Method::GET, "/feeds", index)
+    .closed_route(Method::GET, r"/feed/(\d+)", show_channel)
+    .closed_route(Method::GET, r"/item/(\d+)", show_item)
+    .closed_route(Method::GET, r"/items/(\d+)", show_items)
+    .closed_route(Method::POST, "/add_feed", add_feed);
   router
 }
 
@@ -55,7 +55,7 @@ pub fn start_web() {
   }));
 }
 
-fn add_feed(req: Request<Body>, username: Option<String>) -> ResponseFuture {
+fn add_feed(req: Request<Body>, claims: &Claims) -> ResponseFuture {
   let response = req.into_body().concat2().map(move |chunk| {
     let params = form_urlencoded::parse(chunk.as_ref())
       .into_owned()
@@ -76,14 +76,14 @@ fn add_feed(req: Request<Body>, username: Option<String>) -> ResponseFuture {
   Box::new(response)
 }
 
-fn home(req: Request<Body>, _: Option<String>) -> ResponseFuture {
+fn home(_req: Request<Body>) -> ResponseFuture {
   let mut f = File::open("vue/dist/index.html").unwrap();
   let mut buffer = String::new();
   f.read_to_string(&mut buffer).unwrap();
   Router::response(Body::from(buffer), StatusCode::OK)
 }
 
-fn index(req: Request<Body>, username: Option<String>) -> ResponseFuture {
+fn index(_req: Request<Body>, claims: &Claims) -> ResponseFuture {
   let channels = get_channels();
   let mut body = Body::empty();
   let mut status = StatusCode::NOT_FOUND;
@@ -97,7 +97,7 @@ fn index(req: Request<Body>, username: Option<String>) -> ResponseFuture {
   Router::response(body, status)
 }
 
-fn authenticate(req: Request<Body>, username: Option<String>) -> ResponseFuture {
+fn authenticate(req: Request<Body>) -> ResponseFuture {
   let response = req.into_body().concat2().map(move |chunk| {
     let mut status = StatusCode::UNAUTHORIZED;
     let mut body = Body::empty();
@@ -108,9 +108,9 @@ fn authenticate(req: Request<Body>, username: Option<String>) -> ResponseFuture 
 
     match (params.get("username"), params.get("password")) {
       (Some(u), Some(p)) => match User::check_user(&u, &p) {
-        true => {
+        Some(user) => {
           status = StatusCode::OK;
-          let jwt = generate_jwt(u).unwrap();
+          let jwt = generate_jwt(&user).unwrap();
           body = Body::from(jwt);
         }
         _ => (),
@@ -122,7 +122,7 @@ fn authenticate(req: Request<Body>, username: Option<String>) -> ResponseFuture 
   Box::new(response)
 }
 
-fn show_channel(req: Request<Body>, username: Option<String>) -> ResponseFuture {
+fn show_channel(req: Request<Body>, claims: &Claims) -> ResponseFuture {
   let req_path = req.uri().path();
   let re = Regex::new(r"/feed/(\d+)").unwrap();
   let ch_id = match re.captures(req_path) {
@@ -145,7 +145,7 @@ fn show_channel(req: Request<Body>, username: Option<String>) -> ResponseFuture 
   Router::response(body, status)
 }
 
-fn show_item(req: Request<Body>, username: Option<String>) -> ResponseFuture {
+fn show_item(req: Request<Body>, claims: &Claims) -> ResponseFuture {
   let req_path = req.uri().path();
   let re = Regex::new(r"/item/(\d+)").unwrap();
   let ch_id = match re.captures(req_path) {
@@ -171,7 +171,7 @@ fn show_item(req: Request<Body>, username: Option<String>) -> ResponseFuture {
   Router::response(body, status)
 }
 
-fn show_items(req: Request<Body>, username: Option<String>) -> ResponseFuture {
+fn show_items(req: Request<Body>, claims: &Claims) -> ResponseFuture {
   let req_path = req.uri().path();
   let re = Regex::new(r"/items/(\d+)").unwrap();
   let ch_id = match re.captures(req_path) {
@@ -192,7 +192,7 @@ fn show_items(req: Request<Body>, username: Option<String>) -> ResponseFuture {
   Router::response(body, status)
 }
 
-fn show_asset(req: Request<Body>, _: Option<String>) -> ResponseFuture {
+fn show_asset(req: Request<Body>) -> ResponseFuture {
   let req_path = req.uri().path();
   let re = Regex::new(r"/static/(.+)").unwrap();
   let d = match re.captures(req_path) {
@@ -231,8 +231,7 @@ fn show_asset(req: Request<Body>, _: Option<String>) -> ResponseFuture {
   Box::new(response)
 }
 
-fn options_headers(_req: Request<Body>, _: Option<String>) -> ResponseFuture {
-  let mut headers = HeaderMap::new();
+fn options_headers(_req: Request<Body>) -> ResponseFuture {
   Box::new(future::ok(
     Response::builder()
       .header(ACCESS_CONTROL_ALLOW_ORIGIN, "*")
@@ -252,7 +251,7 @@ fn options_headers(_req: Request<Body>, _: Option<String>) -> ResponseFuture {
   ))
 }
 
-fn check_jwt(req: &Request<Body>) -> Option<String> {
+fn decode_jwt(req: &Request<Body>) -> Option<Claims> {
   let secret = env::var("JWT_SECRET").unwrap();
 
   let token = match req.headers().get(AUTHORIZATION) {
@@ -262,23 +261,17 @@ fn check_jwt(req: &Request<Body>) -> Option<String> {
 
   match decode::<Claims>(&token, secret.as_ref(), &Validation::default()) {
     Ok(jwt) => {
-      let username = jwt.claims.name;
-      info!("{:?}", username);
-      Some(username)
+      info!("{:?}", jwt.claims.name);
+      Some(jwt.claims)
     }
     Err(_) => None,
   }
 }
 
-fn generate_jwt(user: &str) -> Option<String> {
-  let start = SystemTime::now();
-  let since_the_epoch = start
-    .duration_since(UNIX_EPOCH)
-    .expect("Time went backwards");
-
+fn generate_jwt(user: &User) -> Option<String> {
   let claims = Claims {
-    iat: since_the_epoch.as_secs(),
-    name: user.to_string(),
+    name: user.username.to_string(),
+    id: user.id,
   };
 
   match env::var("JWT_SECRET") {
@@ -286,12 +279,19 @@ fn generate_jwt(user: &str) -> Option<String> {
       Ok(jwt) => Some(jwt),
       Err(_) => None,
     },
-    Err(e) => None,
+    Err(_) => None,
   }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-struct Claims {
-  iat: u64,
-  name: String,
+// types
+
+pub type AuthenticationHandler = for<'r> fn(&'r Request<Body>) -> Option<Claims>;
+pub type ProtectedRequestFuture = fn(Request<Body>, &Claims) -> ResponseFuture;
+pub type UnprotectedRequestFuture = fn(Request<Body>) -> ResponseFuture;
+pub type ResponseFuture = Box<Future<Item = Response<Body>, Error = Error> + Send>;
+
+#[derive(Clone)]
+pub enum RequestSignature {
+  Closed(ProtectedRequestFuture),
+  Open(UnprotectedRequestFuture),
 }

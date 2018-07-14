@@ -11,13 +11,12 @@ extern crate jsonwebtoken;
 extern crate pretty_env_logger;
 extern crate regex;
 extern crate rss;
+extern crate serde_json;
 extern crate sodiumoxide;
 extern crate tokio;
 extern crate tokio_fs;
 extern crate tokio_io;
 extern crate url;
-#[macro_use]
-extern crate serde_json;
 #[macro_use]
 extern crate serde_derive;
 

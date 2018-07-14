@@ -5,14 +5,13 @@ use rss::{Channel, Item};
 use std::io::BufReader;
 use std::str;
 use std::time::{Duration, Instant};
-use tokio::prelude::*;
 use tokio::timer::Interval;
 
 use db::{
-  channel_exists, find_duplicates, get_channel, get_channel_urls, get_channels,
-  get_latest_item_date, insert_channel, insert_items, update_item, NewItem,
+  channel_exists, find_duplicates, get_channel_urls, insert_channel, insert_items, update_item,
+  NewItem,
 };
-use models::{FeedChannel, FeedItem};
+use models::FeedChannel;
 
 pub fn start_feed_loop() {
   let task = Interval::new(Instant::now(), Duration::from_secs(300))
@@ -118,7 +117,7 @@ fn process_duplicates(items: Vec<NewItem>) -> Vec<NewItem> {
         items.into_iter().partition(|x| !guids.contains(&x.guid));
 
       duplicated_items.into_iter().for_each(|d| {
-        let idx = dupes.iter().find(|(x, y, z)| y == &d.guid).unwrap();
+        let idx = dupes.iter().find(|(_, y, _)| y == &d.guid).unwrap();
         if d.published_at != idx.2 {
           update_item(idx.0, &d)
         }

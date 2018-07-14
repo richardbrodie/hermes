@@ -1,21 +1,21 @@
 use futures::{future, Future};
 use hyper::{Body, Error, Method, Request, Response, StatusCode};
 use regex::Regex;
-use std::fmt;
 
-pub type AuthenticationHandler = Option<for<'r> fn(&'r Request<Body>) -> Option<String>>;
-pub type RequestFuture = fn(Request<Body>, Option<String>) -> ResponseFuture;
-pub type ResponseFuture = Box<Future<Item = Response<Body>, Error = Error> + Send>;
+use models::Claims;
+use web::{
+  AuthenticationHandler, ProtectedRequestFuture, RequestSignature, ResponseFuture,
+  UnprotectedRequestFuture,
+};
 
 #[derive(Clone)]
 pub struct Route {
   verb: Method,
   route: Regex,
-  with: RequestFuture,
-  authenticatable: bool,
+  with: RequestSignature,
 }
 impl Route {
-  pub fn new(verb: Method, route: &str, with: RequestFuture, auth: bool) -> Route {
+  pub fn new(verb: Method, route: &str, with: RequestSignature) -> Route {
     let mut r = route.to_owned();
     if !r.starts_with("^") {
       r = format!("^{}", r);
@@ -29,7 +29,6 @@ impl Route {
       verb: verb,
       route: re,
       with: with,
-      authenticatable: auth,
     }
   }
   pub fn matches(&self, path: &str) -> bool {
@@ -40,7 +39,7 @@ impl Route {
 #[derive(Clone)]
 pub struct Router {
   routes: Vec<Route>,
-  auth_handler: AuthenticationHandler,
+  auth_handler: Option<AuthenticationHandler>,
 }
 impl Router {
   pub fn build() -> Router {
@@ -51,13 +50,29 @@ impl Router {
     }
   }
 
-  pub fn auth_handler(&mut self, handler: fn(&Request<Body>) -> Option<String>) -> &mut Self {
+  pub fn auth_handler(&mut self, handler: AuthenticationHandler) -> &mut Self {
     self.auth_handler = Some(handler);
     self
   }
 
-  pub fn route(&mut self, verb: Method, path: &str, with: RequestFuture, auth: bool) -> &mut Self {
-    let route = Route::new(verb, path, with, auth);
+  pub fn open_route(
+    &mut self,
+    verb: Method,
+    path: &str,
+    with: UnprotectedRequestFuture,
+  ) -> &mut Self {
+    let route = Route::new(verb, path, RequestSignature::Open(with));
+    self.routes.push(route);
+    self
+  }
+
+  pub fn closed_route(
+    &mut self,
+    verb: Method,
+    path: &str,
+    with: ProtectedRequestFuture,
+  ) -> &mut Self {
+    let route = Route::new(verb, path, RequestSignature::Closed(with));
     self.routes.push(route);
     self
   }
@@ -69,13 +84,17 @@ impl Router {
     for r in &self.routes {
       if r.matches(path) && &r.verb == req.method() {
         let mut username: Option<String> = None;
-        if r.authenticatable {
-          match (&self.auth_handler.unwrap())(&req) {
-            Some(user) => username = Some(user),
-            None => return Router::throw_code(StatusCode::UNAUTHORIZED),
-          };
-        }
-        return (r.with)(req, username);
+
+        return match r.with {
+          RequestSignature::Open(fn1) => (fn1)(req),
+          RequestSignature::Closed(fn2) => {
+            let username = match (&self.auth_handler.unwrap())(&req) {
+              Some(user) => user,
+              None => return Router::throw_code(StatusCode::UNAUTHORIZED),
+            };
+            (fn2)(req, &username)
+          }
+        };
       }
     }
     info!("not found");
