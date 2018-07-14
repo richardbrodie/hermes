@@ -16,7 +16,7 @@ use tokio_fs;
 use tokio_io;
 use url::form_urlencoded;
 
-use db::{get_channel_with_items, get_channels, get_item, get_items};
+use db::{self, get_channel_with_items, get_channels, get_item, get_items};
 use feed;
 use models::{Claims, User};
 use router::Router;
@@ -33,7 +33,8 @@ pub fn router() -> Router {
     .closed_route(Method::GET, r"/feed/(\d+)", show_channel)
     .closed_route(Method::GET, r"/item/(\d+)", show_item)
     .closed_route(Method::GET, r"/items/(\d+)", show_items)
-    .closed_route(Method::POST, "/add_feed", add_feed);
+    .closed_route(Method::POST, "/add_feed", add_feed)
+    .closed_route(Method::POST, "/subscribe", subscribe);
   router
 }
 
@@ -55,6 +56,7 @@ pub fn start_web() {
 }
 
 fn add_feed(req: Request<Body>, claims: &Claims) -> ResponseFuture {
+  let user_id = claims.id;
   let response = req.into_body().concat2().map(move |chunk| {
     let params = form_urlencoded::parse(chunk.as_ref())
       .into_owned()
@@ -75,6 +77,28 @@ fn add_feed(req: Request<Body>, claims: &Claims) -> ResponseFuture {
   Box::new(response)
 }
 
+fn subscribe(req: Request<Body>, claims: &Claims) -> ResponseFuture {
+  let user_id = claims.id.clone();
+  let response = req.into_body().concat2().map(move |chunk| {
+    let params = form_urlencoded::parse(chunk.as_ref())
+      .into_owned()
+      .collect::<HashMap<String, String>>();
+
+    match params.get("feed_id") {
+      Some(n) => {
+        let fid: i32 = n.parse().unwrap();
+        let res = db::subscribe(&user_id, &fid);
+        Response::new(Body::empty())
+      }
+      None => Response::builder()
+        .status(StatusCode::BAD_REQUEST)
+        .body(Body::from("parameter 'feed_id' missing"))
+        .unwrap(),
+    }
+  });
+  Box::new(response)
+}
+
 fn home(_req: Request<Body>) -> ResponseFuture {
   let mut f = File::open("vue/dist/index.html").unwrap();
   let mut buffer = String::new();
@@ -83,7 +107,9 @@ fn home(_req: Request<Body>) -> ResponseFuture {
 }
 
 fn index(_req: Request<Body>, claims: &Claims) -> ResponseFuture {
-  let channels = get_channels();
+  let user_id = claims.id.clone();
+  let channels = db::get_subscribed_channels(&user_id);
+  // let channels = get_channels();
   let mut body = Body::empty();
   let mut status = StatusCode::NOT_FOUND;
   match serde_json::to_string(&channels) {
@@ -285,9 +311,9 @@ fn generate_jwt(user: &User) -> Option<String> {
 // types
 
 pub type AuthenticationHandler = for<'r> fn(&'r Request<Body>) -> Option<Claims>;
-pub type ProtectedRequestFuture = fn(Request<Body>, &Claims) -> ResponseFuture;
+pub type ProtectedRequestFuture = for<'r> fn(Request<Body>, &'r Claims) -> ResponseFuture;
 pub type UnprotectedRequestFuture = fn(Request<Body>) -> ResponseFuture;
-pub type ResponseFuture = Box<Future<Item = Response<Body>, Error = Error> + Send>;
+pub type ResponseFuture = Box<Future<Item = Response<Body>, Error = Error> + Send + 'static>;
 
 #[derive(Clone)]
 pub enum RequestSignature {

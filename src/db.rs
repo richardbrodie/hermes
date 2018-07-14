@@ -3,11 +3,12 @@ use diesel::dsl::exists;
 use diesel::prelude::*;
 use diesel::{self, select};
 use dotenv::dotenv;
-use models::{FeedChannel, FeedItem, User};
+use models::{FeedChannel, FeedItem, Subscription, User};
 use schema::feed_channels::dsl::*;
 use schema::feed_items::dsl::*;
+use schema::subscriptions::dsl::*;
 use schema::users::dsl::*;
-use schema::{feed_channels, feed_items};
+use schema::{feed_channels, feed_items, subscriptions, users};
 use std::env;
 
 #[derive(Insertable)]
@@ -59,6 +60,14 @@ pub fn establish_connection() -> PgConnection {
 
 // channels
 
+pub fn get_channel(id: i32) -> Option<FeedChannel> {
+  let connection = establish_connection();
+  match feed_channels.find(id).first::<FeedChannel>(&connection) {
+    Ok(feed) => Some(feed),
+    Err(_) => None,
+  }
+}
+
 pub fn find_channel_by_url(url: &str) -> FeedChannel {
   let connection = establish_connection();
   let res = feed_channels
@@ -93,14 +102,6 @@ pub fn insert_channel(channel: &mut FeedChannel) {
   channel.id = result.id;
 }
 
-pub fn get_channel(id: i32) -> Option<FeedChannel> {
-  let connection = establish_connection();
-  match feed_channels.find(id).first::<FeedChannel>(&connection) {
-    Ok(feed) => Some(feed),
-    Err(_) => None,
-  }
-}
-
 pub fn get_channel_with_items(id: i32) -> Option<(FeedChannel, Vec<FeedItem>)> {
   let connection = establish_connection();
   let res = get_channel(id);
@@ -116,20 +117,9 @@ pub fn get_channel_with_items(id: i32) -> Option<(FeedChannel, Vec<FeedItem>)> {
   }
 }
 
-pub fn get_items(id: i32) -> Vec<FeedItem> {
-  let connection = establish_connection();
-  let items = feed_items
-    .filter(feed_channel_id.eq(id))
-    .order(feed_items::published_at.desc())
-    .load::<FeedItem>(&connection)
-    .expect("Error loading feeds");
-  items
-}
-
 pub fn get_channels() -> Vec<FeedChannel> {
   let connection = establish_connection();
   let results = feed_channels
-    .limit(5)
     .load::<FeedChannel>(&connection)
     .expect("Error loading feeds");
   results
@@ -146,6 +136,24 @@ pub fn get_channel_urls() -> Vec<(i32, String)> {
 
 //items
 
+pub fn get_item(id: i32) -> Option<FeedItem> {
+  let connection = establish_connection();
+  match feed_items.find(id).first::<FeedItem>(&connection) {
+    Ok(item) => Some(item),
+    Err(_) => None,
+  }
+}
+
+pub fn get_items(id: i32) -> Vec<FeedItem> {
+  let connection = establish_connection();
+  let items = feed_items
+    .filter(feed_items::feed_channel_id.eq(id))
+    .order(feed_items::published_at.desc())
+    .load::<FeedItem>(&connection)
+    .expect("Error loading feeds");
+  items
+}
+
 pub fn insert_items(items: &Vec<NewItem>) {
   use schema::feed_items;
   let connection = establish_connection();
@@ -155,17 +163,12 @@ pub fn insert_items(items: &Vec<NewItem>) {
     .expect("Error saving new post");
 }
 
-pub fn get_item(id: i32) -> Option<FeedItem> {
-  let connection = establish_connection();
-  match feed_items.find(id).first::<FeedItem>(&connection) {
-    Ok(item) => Some(item),
-    Err(_) => None,
-  }
-}
-
 pub fn update_item(id: i32, item: &NewItem) {
   let connection = establish_connection();
-  diesel::update(feed_items.find(id)).set(item);
+  diesel::update(feed_items.find(id))
+    .set(item)
+    .execute(&connection)
+    .expect("Error updating item");
 }
 
 pub fn find_duplicates(guids: Vec<&str>) -> Option<Vec<(i32, String, NaiveDateTime)>> {
@@ -184,7 +187,7 @@ pub fn find_duplicates(guids: Vec<&str>) -> Option<Vec<(i32, String, NaiveDateTi
 pub fn get_latest_item_date(channel_id: i32) -> Option<NaiveDateTime> {
   let connection = establish_connection();
   match feed_items
-    .filter(feed_channel_id.eq(channel_id))
+    .filter(feed_items::feed_channel_id.eq(channel_id))
     .order(feed_items::published_at.desc())
     .first::<FeedItem>(&connection)
   {
@@ -199,6 +202,37 @@ pub fn get_user(uname: &str) -> Option<User> {
   let connection = establish_connection();
   match users.filter(username.eq(uname)).first::<User>(&connection) {
     Ok(user) => Some(user),
+    Err(_) => None,
+  }
+}
+
+// subscriptions
+
+pub fn subscribe(uid: &i32, fid: &i32) {
+  let connection = establish_connection();
+
+  diesel::insert_into(subscriptions)
+    .values((subscriptions::feed_channel_id.eq(fid), user_id.eq(uid)))
+    .execute(&connection)
+    .expect("Error saving new subscription");
+}
+
+pub fn get_subscribed_channels(uid: &i32) -> Option<Vec<FeedChannel>> {
+  let connection = establish_connection();
+  match subscriptions
+    .inner_join(feed_channels)
+    .filter(subscriptions::user_id.eq(uid))
+    .select((
+      feed_channels::id,
+      feed_channels::title,
+      site_link,
+      feed_link,
+      feed_channels::description,
+      updated_at,
+    ))
+    .load::<FeedChannel>(&connection)
+  {
+    Ok(feeds) => Some(feeds),
     Err(_) => None,
   }
 }

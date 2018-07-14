@@ -23,6 +23,14 @@ table! {
 }
 
 table! {
+    subscriptions (id) {
+        id -> Int4,
+        user_id -> Int4,
+        feed_channel_id -> Int4,
+    }
+}
+
+table! {
     users (id) {
         id -> Int4,
         username -> Varchar,
@@ -31,9 +39,12 @@ table! {
 }
 
 joinable!(feed_items -> feed_channels (feed_channel_id));
+joinable!(subscriptions -> feed_channels (feed_channel_id));
+joinable!(subscriptions -> users (user_id));
 
 allow_tables_to_appear_in_same_query!(
     feed_channels,
     feed_items,
+    subscriptions,
     users,
 );
