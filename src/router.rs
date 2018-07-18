@@ -1,8 +1,7 @@
-use futures::{future, Future};
-use hyper::{Body, Error, Method, Request, Response, StatusCode};
+use futures::future;
+use hyper::{Body, Method, Request, Response, StatusCode};
 use regex::Regex;
 
-use models::Claims;
 use web::{
   AuthenticationHandler, ProtectedRequestFuture, RequestSignature, ResponseFuture,
   UnprotectedRequestFuture,
@@ -83,8 +82,6 @@ impl Router {
 
     for r in &self.routes {
       if r.matches(path) && &r.verb == req.method() {
-        let mut username: Option<String> = None;
-
         return match r.with {
           RequestSignature::Open(fn1) => (fn1)(req),
           RequestSignature::Closed(fn2) => {

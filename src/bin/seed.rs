@@ -4,7 +4,6 @@ extern crate sodiumoxide;
 
 use diesel::prelude::*;
 use sodiumoxide::crypto::pwhash;
-use std::str::from_utf8;
 
 use feeds_lib::db::establish_connection;
 use feeds_lib::schema::users::dsl::*;
@@ -23,7 +22,8 @@ fn main() {
     pwhash::MEMLIMIT_INTERACTIVE,
   ).unwrap();
 
-  let res = diesel::insert_into(users)
+  diesel::insert_into(users)
     .values((username.eq(userpass), password_hash.eq(&pwh[..])))
-    .execute(&connection);
+    .execute(&connection)
+    .expect("Error inserting to db");
 }

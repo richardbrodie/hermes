@@ -4,15 +4,14 @@ use hyper::header::{
   ACCESS_CONTROL_ALLOW_ORIGIN, ACCESS_CONTROL_EXPOSE_HEADERS, ALLOW, AUTHORIZATION,
 };
 use hyper::service::service_fn;
-use hyper::{rt, Body, Error, HeaderMap, Method, Request, Response, Server, StatusCode};
+use hyper::{rt, Body, Error, Method, Request, Response, Server, StatusCode};
 use jsonwebtoken::{decode, encode, Header, Validation};
 use regex::Regex;
 use serde_json;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::prelude::*;
-use std::time::{SystemTime, UNIX_EPOCH};
-use std::{env, path, str};
+use std::{env, path};
 use tokio_fs;
 use tokio_io;
 use url::form_urlencoded;
