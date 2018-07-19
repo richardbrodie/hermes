@@ -60,6 +60,7 @@ pub fn establish_connection() -> PgConnection {
 
 // channels
 
+//deprecated
 pub fn get_channel(id: i32) -> Option<FeedChannel> {
   let connection = establish_connection();
   match feed_channels.find(id).first::<FeedChannel>(&connection) {
@@ -68,19 +69,23 @@ pub fn get_channel(id: i32) -> Option<FeedChannel> {
   }
 }
 
-pub fn find_channel_by_url(url: &str) -> FeedChannel {
+pub fn find_channel_by_url(url: &str) -> Option<FeedChannel> {
   let connection = establish_connection();
-  let res = feed_channels
+  match feed_channels
     .filter(feed_link.eq(url))
-    .first::<FeedChannel>(&connection);
-  res.unwrap()
+    .first::<FeedChannel>(&connection)
+  {
+    Ok(ch) => Some(ch),
+    Err(_) => None,
+  }
 }
 
-pub fn channel_exists(url: &str) -> bool {
+pub fn get_channel_id(url: &str) -> Result<i32, diesel::result::Error> {
   let connection = establish_connection();
-  select(exists(feed_channels.filter(feed_link.eq(url))))
-    .get_result(&connection)
-    .unwrap()
+  feed_channels
+    .filter(feed_link.eq(url))
+    .select(feed_channels::id)
+    .first(&connection)
 }
 
 pub fn insert_channel(channel: &mut FeedChannel) {
@@ -102,6 +107,7 @@ pub fn insert_channel(channel: &mut FeedChannel) {
   channel.id = result.id;
 }
 
+// deprecated
 pub fn get_channel_with_items(id: i32) -> Option<(FeedChannel, Vec<FeedItem>)> {
   let connection = establish_connection();
   let res = get_channel(id);
@@ -117,6 +123,7 @@ pub fn get_channel_with_items(id: i32) -> Option<(FeedChannel, Vec<FeedItem>)> {
   }
 }
 
+// deprecated
 pub fn get_channels() -> Vec<FeedChannel> {
   let connection = establish_connection();
   let results = feed_channels
@@ -211,10 +218,13 @@ pub fn get_user(uname: &str) -> Option<User> {
 pub fn subscribe(uid: &i32, fid: &i32) {
   let connection = establish_connection();
 
-  diesel::insert_into(subscriptions)
+  match diesel::insert_into(subscriptions)
     .values((subscriptions::feed_channel_id.eq(fid), user_id.eq(uid)))
     .execute(&connection)
-    .expect("Error saving new subscription");
+  {
+    Ok(r) => info!("res: {:?}", r),
+    Err(_) => (),
+  }
 }
 
 pub fn get_subscribed_channels(uid: &i32) -> Option<Vec<FeedChannel>> {

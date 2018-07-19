@@ -1,14 +1,16 @@
 use chrono::{DateTime, FixedOffset, Utc};
+use futures::future::{self, IntoFuture};
 use hyper::rt::{self, Future, Stream};
 use hyper::Client;
 use rss::{Channel, Item};
 use std::io::BufReader;
+use std::option::Option;
 use std::str;
 use std::time::{Duration, Instant};
 use tokio::timer::Interval;
 
 use db::{
-  channel_exists, find_duplicates, get_channel_urls, insert_channel, insert_items, update_item,
+  self, find_duplicates, get_channel_urls, insert_channel, insert_items, subscribe, update_item,
   NewItem,
 };
 use models::FeedChannel;
@@ -27,14 +29,17 @@ pub fn start_feed_loop() {
   rt::spawn(task);
 }
 
-pub fn add_feed(url: String) {
-  info!("adding feed: {}", url);
-  if channel_exists(&url) {
-    info!("feed exists");
-    return ();
-  }
+pub fn subscribe_feed(url: String, uid: i32) {
+  rt::spawn(future::lazy(move || {
+    db::get_channel_id(&url)
+      .into_future()
+      .or_else(|_| add_feed(url))
+      .and_then(move |c| Ok(subscribe(&uid, &c)))
+  }));
+}
 
-  let work = fetch_feed(url.to_string())
+pub fn add_feed(url: String) -> impl Future<Item = i32, Error = ()> {
+  fetch_feed(url.to_string())
     .and_then(move |feed| {
       let mut channel = FeedChannel {
         id: 0,
@@ -50,10 +55,8 @@ pub fn add_feed(url: String) {
     .and_then(move |(feed, channel_id)| {
       let items: Vec<NewItem> = process_items(feed.items(), &channel_id);
       insert_items(&items);
-      Ok(())
-    });
-
-  rt::spawn(work);
+      Ok(channel_id)
+    })
 }
 
 pub fn update_feed(channel_id: i32, channel_url: String) {

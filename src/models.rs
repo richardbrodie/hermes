@@ -27,11 +27,8 @@ pub struct FeedChannel {
   pub updated_at: NaiveDateTime,
 }
 
-#[derive(Debug, Queryable, Associations, Identifiable, Serialize)]
-// #[belongs_to(User)]
-// #[belongs_to(FeedChannel)]
+#[derive(Debug, Queryable, Associations, Serialize)]
 pub struct Subscription {
-  pub id: i32,
   pub user_id: i32,
   pub feed_channel_id: i32,
 }

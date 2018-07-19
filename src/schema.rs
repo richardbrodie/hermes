@@ -23,8 +23,7 @@ table! {
 }
 
 table! {
-    subscriptions (id) {
-        id -> Int4,
+    subscriptions (user_id, feed_channel_id) {
         user_id -> Int4,
         feed_channel_id -> Int4,
     }

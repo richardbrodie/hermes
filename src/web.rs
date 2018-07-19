@@ -33,8 +33,7 @@ pub fn router() -> Router {
     .closed_route(Method::GET, r"/feed/(\d+)", show_channel)
     .closed_route(Method::GET, r"/item/(\d+)", show_item)
     .closed_route(Method::GET, r"/items/(\d+)", show_items)
-    .closed_route(Method::POST, "/add_feed", add_feed)
-    .closed_route(Method::POST, "/subscribe", subscribe);
+    .closed_route(Method::POST, "/add_feed", add_feed);
   router
 }
 
@@ -56,7 +55,7 @@ pub fn start_web() {
 }
 
 fn add_feed(req: Request<Body>, claims: &Claims) -> ResponseFuture {
-  let user_id = claims.id;
+  let user_id = claims.id.clone();
   let response = req.into_body().concat2().map(move |chunk| {
     let params = form_urlencoded::parse(chunk.as_ref())
       .into_owned()
@@ -65,7 +64,7 @@ fn add_feed(req: Request<Body>, claims: &Claims) -> ResponseFuture {
     match params.get("feed_url") {
       Some(n) => {
         info!("feed: {:?}", n);
-        feed::add_feed(n.to_owned());
+        feed::subscribe_feed(n.to_owned(), user_id);
         Response::new(Body::empty())
       }
       None => Response::builder()
@@ -77,27 +76,27 @@ fn add_feed(req: Request<Body>, claims: &Claims) -> ResponseFuture {
   Box::new(response)
 }
 
-fn subscribe(req: Request<Body>, claims: &Claims) -> ResponseFuture {
-  let user_id = claims.id.clone();
-  let response = req.into_body().concat2().map(move |chunk| {
-    let params = form_urlencoded::parse(chunk.as_ref())
-      .into_owned()
-      .collect::<HashMap<String, String>>();
+// fn subscribe(req: Request<Body>, claims: &Claims) -> ResponseFuture {
+//   let user_id = claims.id.clone();
+//   let response = req.into_body().concat2().map(move |chunk| {
+//     let params = form_urlencoded::parse(chunk.as_ref())
+//       .into_owned()
+//       .collect::<HashMap<String, String>>();
 
-    match params.get("feed_id") {
-      Some(n) => {
-        let fid: i32 = n.parse().unwrap();
-        let res = db::subscribe(&user_id, &fid);
-        Response::new(Body::empty())
-      }
-      None => Response::builder()
-        .status(StatusCode::BAD_REQUEST)
-        .body(Body::from("parameter 'feed_id' missing"))
-        .unwrap(),
-    }
-  });
-  Box::new(response)
-}
+//     match params.get("feed_id") {
+//       Some(n) => {
+//         let fid: i32 = n.parse().unwrap();
+//         let res = db::subscribe(&user_id, &fid);
+//         Response::new(Body::empty())
+//       }
+//       None => Response::builder()
+//         .status(StatusCode::BAD_REQUEST)
+//         .body(Body::from("parameter 'feed_id' missing"))
+//         .unwrap(),
+//     }
+//   });
+//   Box::new(response)
+// }
 
 fn home(_req: Request<Body>) -> ResponseFuture {
   let mut f = File::open("vue/dist/index.html").unwrap();
