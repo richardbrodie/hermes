@@ -11,6 +11,7 @@ extern crate jsonwebtoken;
 extern crate pretty_env_logger;
 extern crate regex;
 extern crate rss;
+#[macro_use]
 extern crate serde_json;
 extern crate sodiumoxide;
 extern crate tokio;

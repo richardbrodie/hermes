@@ -1,22 +1,23 @@
 <template>
   <div id='app'>
-    <!-- <jwt/> -->
-    <sidebar/>
     <router-view/>
   </div>
 </template>
 
 <script>
-import Sidebar from './components/Sidebar';
-import FeedItems from './components/FeedItems';
-import Jwt from './components/Jwt';
+import FeedView from "./components/FeedView";
+import Login from "./components/Login";
 
 export default {
-  name: 'App',
+  name: "App",
+  updated() {
+    if (!localStorage.token && this.$route.path !== "/") {
+      this.$router.push("/?redirect=" + this.$route.path);
+    }
+  },
   components: {
-    Sidebar,
-    FeedItems,
-    Jwt
+    FeedView,
+    Login
   }
 };
 </script>
@@ -24,10 +25,9 @@ export default {
 <style lang="scss">
 html {
   background: white;
-  // text-rendering: optimizeLegibility;
   text-rendering: geometricPrecision;
-  font-family: 'Open Sans', sans-serif;
-  font-feature-settings: 'dlig', 'liga', 'lnum', 'kern';
+  font-family: "Open Sans", sans-serif;
+  font-feature-settings: "dlig", "liga", "lnum", "kern";
   line-height: 1.5em;
 }
 body {
@@ -35,14 +35,10 @@ body {
   margin: 0;
 }
 #app {
-  font-family: 'Avenir', Helvetica, Arial, sans-serif;
+  font-family: "Avenir", Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-align: left;
   color: #2c3e50;
-
-  display: grid;
-  grid-template-columns: 200px auto;
-  grid-column-gap: 10px;
 }
 </style>

@@ -135,13 +135,20 @@ fn authenticate(req: Request<Body>) -> ResponseFuture {
         Some(user) => {
           status = StatusCode::OK;
           let jwt = generate_jwt(&user).unwrap();
-          body = Body::from(jwt);
+          let json = json!({
+            "token": jwt,
+          });
+          body = Body::from(json.to_string());
         }
         _ => (),
       },
       _ => status = StatusCode::BAD_REQUEST,
     };
-    Response::builder().status(status).body(body).unwrap()
+    Response::builder()
+      .header("Access-Control-Allow-Origin", "*")
+      .status(status)
+      .body(body)
+      .unwrap()
   });
   Box::new(response)
 }
@@ -278,16 +285,18 @@ fn options_headers(_req: Request<Body>) -> ResponseFuture {
 fn decode_jwt(req: &Request<Body>) -> Option<Claims> {
   let secret = env::var("JWT_SECRET").unwrap();
 
+  let r = r"^Bearer\s([\w_-]+\.[\w_-]+\.[\w=_-]+)$";
+  let regex = Regex::new(&r).unwrap();
   let token = match req.headers().get(AUTHORIZATION) {
-    Some(val) => val.to_str().unwrap().to_string(),
+    Some(val) => match regex.captures(val.to_str().unwrap()) {
+      Some(d) => d.get(1).unwrap().as_str(),
+      None => return None,
+    },
     None => return None,
   };
 
   match decode::<Claims>(&token, secret.as_ref(), &Validation::default()) {
-    Ok(jwt) => {
-      info!("{:?}", jwt.claims.name);
-      Some(jwt.claims)
-    }
+    Ok(jwt) => Some(jwt.claims),
     Err(_) => None,
   }
 }

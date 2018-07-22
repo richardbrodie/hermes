@@ -21,16 +21,15 @@ export default {
     this.fetchData();
   },
   watch: {
-    $route: 'fetchData'
+    $route: "fetchData"
   },
   methods: {
     fetchData() {
       this.axios({
-        url: 'http://localhost:4000/items/' + this.$route.params.id,
-        method: 'GET',
-        crossDomain: true,
-        responseType: 'json',
-        responseEncoding: 'utf8'
+        url: "http://localhost:4000/items/" + this.$route.params.id,
+        method: "GET",
+        responseType: "json",
+        responseEncoding: "utf8"
       }).then(response => {
         this.items = response.data;
       });
