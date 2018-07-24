@@ -26,10 +26,13 @@ export default {
   methods: {
     fetchData() {
       this.axios({
-        url: "http://localhost:4000/items/" + this.$route.params.id,
+        url: "/items/" + this.$route.params.id,
         method: "GET",
         responseType: "json",
-        responseEncoding: "utf8"
+        responseEncoding: "utf8",
+        headers: {
+          Authorization: "Bearer " + this.$store.getters.token
+        }
       }).then(response => {
         this.items = response.data;
       });

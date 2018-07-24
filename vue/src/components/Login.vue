@@ -12,7 +12,6 @@
 
 
 <script>
-import qs from "qs";
 export default {
   name: "Login",
   data() {
@@ -22,48 +21,10 @@ export default {
       error: false
     };
   },
-  updated() {
-    this.checkCurrentLogin();
-  },
-  created() {
-    this.checkCurrentLogin();
-  },
   methods: {
-    checkCurrentLogin() {
-      if (localStorage.token) {
-        this.$router.replace("/feeds");
-      }
-    },
-    login() {
-      this.$http({
-        url: "/authenticate",
-        method: "POST",
-        data: qs.stringify({
-          username: this.username,
-          password: this.password
-        }),
-        responseType: "json",
-        responseEncoding: "utf8"
-      })
-        .then(request => this.loginSuccessful(request))
-        .catch(() => this.loginFailed());
-    },
-
-    loginSuccessful(req) {
-      if (!req.data.token) {
-        this.loginFailed();
-        return;
-      }
-
-      localStorage.token = req.data.token;
-      this.error = false;
-
-      this.$router.replace("/feeds");
-    },
-
-    loginFailed() {
-      this.error = "Login failed!";
-      delete localStorage.token;
+    login: function() {
+      const { username, password } = this;
+      this.$store.dispatch("login", { username, password });
     }
   }
 };
@@ -111,11 +72,5 @@ export default {
 .form button:active,
 .form button:focus {
   background: #43a047;
-}
-body {
-  background: -webkit-linear-gradient(right, #76b852, #8dc26f);
-  background: -moz-linear-gradient(right, #76b852, #8dc26f);
-  background: -o-linear-gradient(right, #76b852, #8dc26f);
-  background: linear-gradient(to left, #76b852, #8dc26f);
 }
 </style>

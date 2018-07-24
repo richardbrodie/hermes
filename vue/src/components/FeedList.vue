@@ -3,7 +3,7 @@
     <table>
       <tbody v-for="feed in feeds" v-bind:key='feed.id'>
         <tr>
-          <td><router-link :to="{ path: '/feeds/'+feed.id }">{{ feed.title }}</router-link></td>
+          <td><router-link :to="{ path: '/feed/'+feed.id }">{{ feed.title }}</router-link></td>
           <td></td>
         </tr>
       </tbody>
@@ -20,18 +20,26 @@ export default {
     };
   },
   created() {
-    this.axios({
-      url: "/feeds",
-      method: "GET",
-      responseType: "json",
-      responseEncoding: "utf8"
-    })
-      .then(response => {
-        this.feeds = response.data;
+    this.fetchData();
+  },
+  methods: {
+    fetchData() {
+      this.axios({
+        url: "/feeds",
+        method: "GET",
+        responseType: "json",
+        responseEncoding: "utf8",
+        headers: {
+          Authorization: "Bearer " + this.$store.getters.token
+        }
       })
-      .catch(err => {
-        console.log(err);
-      });
+        .then(response => {
+          this.feeds = response.data;
+        })
+        .catch(err => {
+          console.log(err);
+        });
+    }
   }
 };
 </script>
