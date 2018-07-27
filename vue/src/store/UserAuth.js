@@ -1,6 +1,4 @@
-import Vue from 'vue';
 import JwtDecode from 'jwt-decode';
-import qs from "qs";
 import { router } from '../router'
 
 const token = localStorage.getItem('token');
@@ -33,25 +31,25 @@ export default {
 
   actions: {
     login({ commit }, { username, password }) {
-      Vue.axios({
-        url: "/authenticate",
+      var url = "http://localhost:4000/authenticate";
+      var body = JSON.stringify({
+        username: username,
+        password: password
+      });
+      var headers = new Headers({
+        "Content-Type": "application/json"
+      });
+      var req = new Request(url, {
         method: "POST",
-        headers: { 'Content-Type': 'application/json' },
-        data: qs.stringify({
-          username: username,
-          password: password
-        }),
-        responseType: "json",
-        responseEncoding: "utf8"
-      })
-        .then(response => {
-          if (response.status == 200) {
-            const token = response.data.token;
-            commit('loginSuccess', token);
-            router.push('/')
-          }
-        })
-        .catch(error => {
+        body: body,
+        headers: headers
+      });
+      fetch(req)
+        .then(resp => resp.json())
+        .then(function (data) {
+          commit('loginSuccess', data.token);
+          router.push('/')
+        }).catch(error => {
           commit('loginFailure', error);
         });
     }

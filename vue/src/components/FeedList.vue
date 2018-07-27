@@ -1,13 +1,8 @@
 <template>
   <div id='feed-list'>
-    <table>
-      <tbody v-for="feed in feeds" v-bind:key='feed.id'>
-        <tr>
-          <td><router-link :to="{ path: '/feed/'+feed.id }">{{ feed.title }}</router-link></td>
-          <td></td>
-        </tr>
-      </tbody>
-    </table>
+    <div v-for="feed in feeds" v-bind:key='feed.id'>
+      <router-link :to="{ path: '/feed/'+feed.id }">{{ feed.title }}</router-link>
+    </div>
   </div>
 </template>
 
@@ -24,18 +19,18 @@ export default {
   },
   methods: {
     fetchData() {
-      this.axios({
-        url: "/feeds",
+      const url = "http://localhost:4000/feeds";
+      var headers = new Headers({
+        "Content-Type": "application/json",
+        Authorization: "Bearer " + this.$store.getters.token
+      });
+      var req = new Request(url, {
         method: "GET",
-        responseType: "json",
-        responseEncoding: "utf8",
-        headers: {
-          Authorization: "Bearer " + this.$store.getters.token
-        }
-      })
-        .then(response => {
-          this.feeds = response.data;
-        })
+        headers: headers
+      });
+      fetch(req)
+        .then(resp => resp.json())
+        .then(data => (this.feeds = data))
         .catch(err => {
           console.log(err);
         });
@@ -44,14 +39,20 @@ export default {
 };
 </script>
 
-<style>
+<style lang="scss">
 a {
-  color: white;
   text-decoration: none;
   outline: 0;
 }
+
 #feed-list {
-  background: #2a2b2f;
+  padding-left: 0.5em;
+  grid-row: 2;
+  grid-column: 1;
   color: white;
+
+  .router-link-active {
+    font-weight: 600;
+  }
 }
 </style>

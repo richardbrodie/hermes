@@ -1,5 +1,6 @@
 <template>
   <div id='feed-view'>
+    <top-bar/>
     <feed-list/>
     <router-view/>
   </div>
@@ -8,11 +9,13 @@
 <script>
 import FeedList from "./FeedList";
 import FeedItems from "./FeedItems";
+import TopBar from "./TopBar";
 export default {
   name: "FeedView",
   components: {
     FeedList,
-    FeedItems
+    FeedItems,
+    TopBar
   }
 };
 </script>
@@ -20,7 +23,7 @@ export default {
 <style lang="scss">
 #feed-view {
   display: grid;
-  grid-template-columns: 200px auto;
+  grid-template-columns: 200px 1fr;
   grid-column-gap: 10px;
 }
 </style>

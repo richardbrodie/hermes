@@ -11,7 +11,7 @@ use serde_json;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::prelude::*;
-use std::{env, path};
+use std::{env, path, str};
 use tokio_fs;
 use tokio_io;
 use url::form_urlencoded;
@@ -108,7 +108,6 @@ fn home(_req: Request<Body>) -> ResponseFuture {
 fn index(_req: Request<Body>, claims: &Claims) -> ResponseFuture {
   let user_id = claims.id.clone();
   let channels = db::get_subscribed_channels(&user_id);
-  // let channels = get_channels();
   let mut body = Body::empty();
   let mut status = StatusCode::NOT_FOUND;
   match serde_json::to_string(&channels) {
@@ -126,9 +125,8 @@ fn authenticate(req: Request<Body>) -> ResponseFuture {
     let mut status = StatusCode::UNAUTHORIZED;
     let mut body = Body::empty();
 
-    let params = form_urlencoded::parse(chunk.as_ref())
-      .into_owned()
-      .collect::<HashMap<String, String>>();
+    let raw_params_str = str::from_utf8(chunk.as_ref()).unwrap();
+    let params: HashMap<String, String> = serde_json::from_str(raw_params_str).unwrap();
 
     match (params.get("username"), params.get("password")) {
       (Some(u), Some(p)) => match User::check_user(&u, &p) {
