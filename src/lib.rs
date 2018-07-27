@@ -8,7 +8,11 @@ extern crate log;
 extern crate futures;
 extern crate hyper;
 extern crate jsonwebtoken;
+#[macro_use]
+extern crate lazy_static;
 extern crate pretty_env_logger;
+extern crate r2d2;
+extern crate r2d2_diesel;
 extern crate regex;
 extern crate rss;
 #[macro_use]

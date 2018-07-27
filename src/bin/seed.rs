@@ -2,6 +2,8 @@ extern crate chrono;
 extern crate diesel;
 extern crate feeds_lib;
 extern crate futures;
+extern crate r2d2;
+extern crate r2d2_diesel;
 extern crate sodiumoxide;
 extern crate tokio;
 
@@ -10,7 +12,7 @@ use diesel::prelude::*;
 use futures::prelude::*;
 use sodiumoxide::crypto::pwhash;
 
-use feeds_lib::db::{self, establish_connection, insert_channel};
+use feeds_lib::db::{self, establish_pool, insert_channel};
 use feeds_lib::feed::fetch_feed;
 use feeds_lib::models::{FeedChannel, User};
 use feeds_lib::schema::feed_channels::dsl::*;
@@ -20,10 +22,12 @@ use feeds_lib::schema::users::dsl::*;
 fn main() {
   let userpass = "admin";
 
-  let connection = establish_connection();
-  diesel::delete(subscriptions).execute(&connection).unwrap();
-  diesel::delete(feed_channels).execute(&connection).unwrap();
-  diesel::delete(users).execute(&connection).unwrap();
+  let pool = establish_pool();
+  let connection = pool.get().unwrap();
+
+  diesel::delete(subscriptions).execute(&*connection).unwrap();
+  diesel::delete(feed_channels).execute(&*connection).unwrap();
+  diesel::delete(users).execute(&*connection).unwrap();
 
   let pwh = pwhash::pwhash(
     userpass.as_bytes(),
@@ -33,7 +37,7 @@ fn main() {
 
   let res = diesel::insert_into(users)
     .values((username.eq(userpass), password_hash.eq(&pwh[..])))
-    .load::<User>(&connection)
+    .load::<User>(&*connection)
     .expect("Error inserting to db");
 
   println!("user: {:?}", res[0].id);

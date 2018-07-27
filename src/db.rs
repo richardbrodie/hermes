@@ -1,15 +1,17 @@
 use chrono::NaiveDateTime;
 use diesel::dsl::exists;
 use diesel::prelude::*;
-use diesel::{self, select};
+use diesel::{self, select, PgConnection};
 use dotenv::dotenv;
 use models::{FeedChannel, FeedItem, Subscription, User};
+use r2d2::{Pool, PooledConnection};
+use r2d2_diesel::ConnectionManager;
 use schema::feed_channels::dsl::*;
 use schema::feed_items::dsl::*;
 use schema::subscriptions::dsl::*;
 use schema::users::dsl::*;
 use schema::{feed_channels, feed_items, subscriptions, users};
-use std::env;
+use std::{env, thread};
 
 #[derive(Insertable)]
 #[table_name = "feed_channels"]
@@ -51,29 +53,50 @@ impl<'a> NewItem<'a> {
 
 // internal
 
-pub fn establish_connection() -> PgConnection {
-  dotenv().ok();
+lazy_static! {
+  static ref POOL: Pool<ConnectionManager<PgConnection>> = {
+    dotenv().ok();
 
-  let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-  PgConnection::establish(&database_url).expect(&format!("Error connecting to {}", database_url))
+    let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+    let manager = ConnectionManager::<PgConnection>::new(database_url);
+    Pool::builder()
+      .build(manager)
+      .expect("Failed to create pool.")
+  };
 }
+
+pub fn establish_pool() -> Pool<ConnectionManager<PgConnection>> {
+  POOL.clone()
+}
+
+// pub fn establish_connection() -> Pool<ConnectionManager<PgConnection>> {
+//   dotenv().ok();
+
+//   let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+//   let manager = ConnectionManager::<PgConnection>::new(database_url);
+//   Pool::builder()
+//     .build(manager)
+//     .expect("Failed to create pool.")
+// }
 
 // channels
 
 //deprecated
 pub fn get_channel(id: i32) -> Option<FeedChannel> {
-  let connection = establish_connection();
-  match feed_channels.find(id).first::<FeedChannel>(&connection) {
+  let pool = establish_pool();
+  let connection = pool.get().unwrap();
+  match feed_channels.find(id).first::<FeedChannel>(&*connection) {
     Ok(feed) => Some(feed),
     Err(_) => None,
   }
 }
 
 pub fn find_channel_by_url(url: &str) -> Option<FeedChannel> {
-  let connection = establish_connection();
+  let pool = establish_pool();
+  let connection = pool.get().unwrap();
   match feed_channels
     .filter(feed_link.eq(url))
-    .first::<FeedChannel>(&connection)
+    .first::<FeedChannel>(&*connection)
   {
     Ok(ch) => Some(ch),
     Err(_) => None,
@@ -81,15 +104,17 @@ pub fn find_channel_by_url(url: &str) -> Option<FeedChannel> {
 }
 
 pub fn get_channel_id(url: &str) -> Result<i32, diesel::result::Error> {
-  let connection = establish_connection();
+  let pool = establish_pool();
+  let connection = pool.get().unwrap();
   feed_channels
     .filter(feed_link.eq(url))
     .select(feed_channels::id)
-    .first(&connection)
+    .first(&*connection)
 }
 
 pub fn insert_channel(channel: &mut FeedChannel) {
-  let connection = establish_connection();
+  let pool = establish_pool();
+  let connection = pool.get().unwrap();
 
   let new_post = NewChannel {
     title: &channel.title,
@@ -101,7 +126,7 @@ pub fn insert_channel(channel: &mut FeedChannel) {
 
   let result = diesel::insert_into(feed_channels::table)
     .values(&new_post)
-    .get_result::<FeedChannel>(&connection)
+    .get_result::<FeedChannel>(&*connection)
     .expect("Error saving new post");
 
   channel.id = result.id;
@@ -109,13 +134,14 @@ pub fn insert_channel(channel: &mut FeedChannel) {
 
 // deprecated
 pub fn get_channel_with_items(id: i32) -> Option<(FeedChannel, Vec<FeedItem>)> {
-  let connection = establish_connection();
+  let pool = establish_pool();
+  let connection = pool.get().unwrap();
   let res = get_channel(id);
   match res {
     Some(channel) => {
       let items = FeedItem::belonging_to(&channel)
         .order(feed_items::published_at.desc())
-        .load::<FeedItem>(&connection)
+        .load::<FeedItem>(&*connection)
         .expect("Error loading feeds");
       Some((channel, items))
     }
@@ -125,18 +151,20 @@ pub fn get_channel_with_items(id: i32) -> Option<(FeedChannel, Vec<FeedItem>)> {
 
 // deprecated
 pub fn get_channels() -> Vec<FeedChannel> {
-  let connection = establish_connection();
+  let pool = establish_pool();
+  let connection = pool.get().unwrap();
   let results = feed_channels
-    .load::<FeedChannel>(&connection)
+    .load::<FeedChannel>(&*connection)
     .expect("Error loading feeds");
   results
 }
 
 pub fn get_channel_urls() -> Vec<(i32, String)> {
-  let connection = establish_connection();
+  let pool = establish_pool();
+  let connection = pool.get().unwrap();
   let results = feed_channels
     .select((feed_channels::id, feed_channels::feed_link))
-    .load(&connection)
+    .load(&*connection)
     .expect("Error loading feeds");
   results
 }
@@ -144,46 +172,51 @@ pub fn get_channel_urls() -> Vec<(i32, String)> {
 //items
 
 pub fn get_item(id: i32) -> Option<FeedItem> {
-  let connection = establish_connection();
-  match feed_items.find(id).first::<FeedItem>(&connection) {
+  let pool = establish_pool();
+  let connection = pool.get().unwrap();
+  match feed_items.find(id).first::<FeedItem>(&*connection) {
     Ok(item) => Some(item),
     Err(_) => None,
   }
 }
 
 pub fn get_items(id: i32) -> Vec<FeedItem> {
-  let connection = establish_connection();
+  let pool = establish_pool();
+  let connection = pool.get().unwrap();
   let items = feed_items
     .filter(feed_items::feed_channel_id.eq(id))
     .order(feed_items::published_at.desc())
-    .load::<FeedItem>(&connection)
+    .load::<FeedItem>(&*connection)
     .expect("Error loading feeds");
   items
 }
 
 pub fn insert_items(items: &Vec<NewItem>) {
   use schema::feed_items;
-  let connection = establish_connection();
+  let pool = establish_pool();
+  let connection = pool.get().unwrap();
   diesel::insert_into(feed_items::table)
     .values(items)
-    .execute(&connection)
+    .execute(&*connection)
     .expect("Error saving new post");
 }
 
 pub fn update_item(id: i32, item: &NewItem) {
-  let connection = establish_connection();
+  let pool = establish_pool();
+  let connection = pool.get().unwrap();
   diesel::update(feed_items.find(id))
     .set(item)
-    .execute(&connection)
+    .execute(&*connection)
     .expect("Error updating item");
 }
 
 pub fn find_duplicates(guids: Vec<&str>) -> Option<Vec<(i32, String, NaiveDateTime)>> {
-  let connection = establish_connection();
+  let pool = establish_pool();
+  let connection = pool.get().unwrap();
   let results = feed_items
     .filter(guid.eq_any(guids))
     .select((feed_items::id, feed_items::guid, feed_items::published_at))
-    .load(&connection)
+    .load(&*connection)
     .expect("Error loading items");
   match results.len() {
     0 => None,
@@ -192,11 +225,12 @@ pub fn find_duplicates(guids: Vec<&str>) -> Option<Vec<(i32, String, NaiveDateTi
 }
 
 pub fn get_latest_item_date(channel_id: i32) -> Option<NaiveDateTime> {
-  let connection = establish_connection();
+  let pool = establish_pool();
+  let connection = pool.get().unwrap();
   match feed_items
     .filter(feed_items::feed_channel_id.eq(channel_id))
     .order(feed_items::published_at.desc())
-    .first::<FeedItem>(&connection)
+    .first::<FeedItem>(&*connection)
   {
     Ok(item) => Some(item.published_at),
     Err(_) => None,
@@ -206,8 +240,9 @@ pub fn get_latest_item_date(channel_id: i32) -> Option<NaiveDateTime> {
 // users
 
 pub fn get_user(uname: &str) -> Option<User> {
-  let connection = establish_connection();
-  match users.filter(username.eq(uname)).first::<User>(&connection) {
+  let pool = establish_pool();
+  let connection = pool.get().unwrap();
+  match users.filter(username.eq(uname)).first::<User>(&*connection) {
     Ok(user) => Some(user),
     Err(_) => None,
   }
@@ -216,11 +251,12 @@ pub fn get_user(uname: &str) -> Option<User> {
 // subscriptions
 
 pub fn subscribe(uid: &i32, fid: &i32) {
-  let connection = establish_connection();
+  let pool = establish_pool();
+  let connection = pool.get().unwrap();
 
   match diesel::insert_into(subscriptions)
     .values((subscriptions::feed_channel_id.eq(fid), user_id.eq(uid)))
-    .execute(&connection)
+    .execute(&*connection)
   {
     Ok(r) => info!("res: {:?}", r),
     Err(_) => (),
@@ -228,7 +264,8 @@ pub fn subscribe(uid: &i32, fid: &i32) {
 }
 
 pub fn get_subscribed_channels(uid: &i32) -> Option<Vec<FeedChannel>> {
-  let connection = establish_connection();
+  let pool = establish_pool();
+  let connection = pool.get().unwrap();
   match subscriptions
     .inner_join(feed_channels)
     .filter(subscriptions::user_id.eq(uid))
@@ -240,7 +277,7 @@ pub fn get_subscribed_channels(uid: &i32) -> Option<Vec<FeedChannel>> {
       feed_channels::description,
       updated_at,
     ))
-    .load::<FeedChannel>(&connection)
+    .load::<FeedChannel>(&*connection)
   {
     Ok(feeds) => Some(feeds),
     Err(_) => None,
