@@ -1,0 +1,18 @@
+html {
+  background: white;
+  text-rendering: geometricPrecision;
+  font-family: "Open Sans", sans-serif;
+  font-feature-settings: "dlig", "liga", "lnum", "kern";
+  line-height: 1.5em;
+}
+body {
+  height: 100vh;
+  margin: 0;
+}
+#app {
+  font-family: "Avenir", Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-align: left;
+  color: #2c3e50;
+}

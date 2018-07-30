@@ -1,13 +1,15 @@
 use chrono::{DateTime, FixedOffset, Utc};
 use futures::future::{self, IntoFuture};
 use hyper::rt::{self, Future, Stream};
-use hyper::Client;
+use hyper::{Body, Client};
+use hyper_tls::HttpsConnector;
 use rss::{Channel, Item};
 use std::io::BufReader;
 use std::option::Option;
 use std::str;
 use std::time::{Duration, Instant};
 use tokio::timer::Interval;
+use url::Url;
 
 use db::{
   self, find_duplicates, get_channel_urls, insert_channel, insert_items, subscribe, update_item,
@@ -16,7 +18,7 @@ use db::{
 use models::FeedChannel;
 
 pub fn start_feed_loop() {
-  let task = Interval::new(Instant::now(), Duration::from_secs(300))
+  let task = Interval::new(Instant::now(), Duration::from_secs(120))
     .for_each(|_| {
       get_channel_urls().into_iter().for_each(|c| {
         update_feed(c.0, c.1);
@@ -25,7 +27,6 @@ pub fn start_feed_loop() {
     })
     .map_err(|e| panic!("delay errored; err={:?}", e));
 
-  info!("starting feed loop");
   rt::spawn(task);
 }
 
@@ -64,7 +65,6 @@ pub fn update_feed(channel_id: i32, channel_url: String) {
     let items: Vec<NewItem> = process_items(feed.items(), &channel_id);
     let new_items = process_duplicates(items);
     if new_items.len() > 0 {
-      info!("{} new items", new_items.len());
       insert_items(&new_items);
     }
     Ok(())
@@ -76,7 +76,8 @@ pub fn update_feed(channel_id: i32, channel_url: String) {
 // internal
 
 pub fn fetch_feed(url: String) -> impl Future<Item = Channel, Error = ()> {
-  let client = Client::new();
+  let https = HttpsConnector::new(2).expect("TLS initialization failed");
+  let client = Client::builder().build::<_, Body>(https);
   client
     .get(url.parse().unwrap())
     .map_err(|_err| ())

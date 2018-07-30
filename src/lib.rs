@@ -7,6 +7,7 @@ extern crate dotenv;
 extern crate log;
 extern crate futures;
 extern crate hyper;
+extern crate hyper_tls;
 extern crate jsonwebtoken;
 #[macro_use]
 extern crate lazy_static;

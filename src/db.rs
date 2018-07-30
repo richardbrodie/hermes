@@ -244,8 +244,8 @@ pub fn subscribe(uid: &i32, fid: &i32) {
     .values((subscriptions::feed_channel_id.eq(fid), user_id.eq(uid)))
     .execute(&*connection)
   {
-    Ok(r) => info!("res: {:?}", r),
-    Err(_) => (),
+    Ok(r) => (),
+    Err(e) => error!("res: {:?}", e),
   }
 }
 

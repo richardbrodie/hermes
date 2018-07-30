@@ -57,46 +57,35 @@ pub fn start_web() {
 fn add_feed(req: Request<Body>, claims: &Claims) -> ResponseFuture {
   let user_id = claims.id.clone();
   let response = req.into_body().concat2().map(move |chunk| {
-    let params = form_urlencoded::parse(chunk.as_ref())
-      .into_owned()
-      .collect::<HashMap<String, String>>();
+    let raw_params_str = str::from_utf8(chunk.as_ref()).unwrap();
+    let params: HashMap<String, String> = match serde_json::from_str(raw_params_str) {
+      Ok(p) => p,
+      Err(_) => form_urlencoded::parse(chunk.as_ref())
+        .into_owned()
+        .collect::<HashMap<String, String>>(),
+    };
+
+    let mut body = Body::empty();
+    let mut status = StatusCode::BAD_REQUEST;
 
     match params.get("feed_url") {
       Some(n) => {
-        info!("feed: {:?}", n);
-        feed::subscribe_feed(n.to_owned(), user_id);
-        Response::new(Body::empty())
+        if !n.is_empty() {
+          info!("feed: {:?}", n);
+          feed::subscribe_feed(n.to_owned(), user_id);
+          status = StatusCode::OK;
+        }
       }
-      None => Response::builder()
-        .status(StatusCode::BAD_REQUEST)
-        .body(Body::from("parameter 'feed_url' missing"))
-        .unwrap(),
+      None => body = Body::from("parameter 'feed_url' missing"),
     }
+    Response::builder()
+      .header("Access-Control-Allow-Origin", "*")
+      .status(status)
+      .body(body)
+      .unwrap()
   });
   Box::new(response)
 }
-
-// fn subscribe(req: Request<Body>, claims: &Claims) -> ResponseFuture {
-//   let user_id = claims.id.clone();
-//   let response = req.into_body().concat2().map(move |chunk| {
-//     let params = form_urlencoded::parse(chunk.as_ref())
-//       .into_owned()
-//       .collect::<HashMap<String, String>>();
-
-//     match params.get("feed_id") {
-//       Some(n) => {
-//         let fid: i32 = n.parse().unwrap();
-//         let res = db::subscribe(&user_id, &fid);
-//         Response::new(Body::empty())
-//       }
-//       None => Response::builder()
-//         .status(StatusCode::BAD_REQUEST)
-//         .body(Body::from("parameter 'feed_id' missing"))
-//         .unwrap(),
-//     }
-//   });
-//   Box::new(response)
-// }
 
 fn home(_req: Request<Body>) -> ResponseFuture {
   let mut f = File::open("vue/dist/index.html").unwrap();
