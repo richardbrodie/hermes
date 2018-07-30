@@ -133,23 +133,6 @@ pub fn insert_channel(channel: &mut FeedChannel) {
 }
 
 // deprecated
-pub fn get_channel_with_items(id: i32) -> Option<(FeedChannel, Vec<FeedItem>)> {
-  let pool = establish_pool();
-  let connection = pool.get().unwrap();
-  let res = get_channel(id);
-  match res {
-    Some(channel) => {
-      let items = FeedItem::belonging_to(&channel)
-        .order(feed_items::published_at.desc())
-        .load::<FeedItem>(&*connection)
-        .expect("Error loading feeds");
-      Some((channel, items))
-    }
-    None => None,
-  }
-}
-
-// deprecated
 pub fn get_channels() -> Vec<FeedChannel> {
   let pool = establish_pool();
   let connection = pool.get().unwrap();
@@ -182,13 +165,16 @@ pub fn get_item(id: i32) -> Option<FeedItem> {
 
 pub fn get_items(id: i32) -> Vec<FeedItem> {
   let pool = establish_pool();
-  let connection = pool.get().unwrap();
-  let items = feed_items
-    .filter(feed_items::feed_channel_id.eq(id))
-    .order(feed_items::published_at.desc())
-    .load::<FeedItem>(&*connection)
-    .expect("Error loading feeds");
-  items
+  let handle = thread::spawn(move || {
+    let connection = pool.get().unwrap();
+    feed_items
+      .filter(feed_items::feed_channel_id.eq(id))
+      .order(feed_items::published_at.desc())
+      .limit(5)
+      .load::<FeedItem>(&*connection)
+      .expect("Error loading feeds")
+  });
+  handle.join().unwrap()
 }
 
 pub fn insert_items(items: &Vec<NewItem>) {

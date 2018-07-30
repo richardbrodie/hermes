@@ -16,7 +16,7 @@ use tokio_fs;
 use tokio_io;
 use url::form_urlencoded;
 
-use db::{self, get_channel_with_items, get_channels, get_item, get_items};
+use db::{self, get_channels, get_item, get_items};
 use feed;
 use models::{Claims, User};
 use router::Router;
@@ -161,15 +161,13 @@ fn show_channel(req: Request<Body>, claims: &Claims) -> ResponseFuture {
 
   let mut status = StatusCode::NOT_FOUND;
   let mut body = Body::empty();
-  match get_channel_with_items(ch_id.parse::<i32>().unwrap()) {
-    Some(data) => match serde_json::to_string(&data) {
-      Ok(json) => {
-        body = Body::from(json);
-        status = StatusCode::OK;
-      }
-      Err(_) => (),
-    },
-    None => (),
+  let data = get_items(ch_id.parse::<i32>().unwrap());
+  match serde_json::to_string(&data) {
+    Ok(json) => {
+      body = Body::from(json);
+      status = StatusCode::OK;
+    }
+    Err(_) => (),
   };
   Router::response(body, status)
 }

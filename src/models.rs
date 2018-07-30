@@ -7,13 +7,17 @@ use schema::*;
 #[derive(Debug, Queryable, Associations, Identifiable, Serialize)]
 #[belongs_to(FeedChannel)]
 pub struct FeedItem {
+  #[serde(skip_serializing)]
   pub id: i32,
+  #[serde(skip_serializing)]
   pub guid: String,
   pub title: String,
   pub link: String,
   pub description: String,
   pub published_at: NaiveDateTime,
+  #[serde(skip_serializing)]
   pub feed_channel_id: i32,
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub content: Option<String>,
 }
 
