@@ -8,52 +8,24 @@ extern crate r2d2_diesel;
 extern crate sha2;
 extern crate tokio;
 
-use base64::encode;
 use chrono::Utc;
-use diesel::prelude::*;
 use futures::prelude::*;
-use sha2::{Digest, Sha256};
-use std::str;
 
-use feeds_lib::db::{self, establish_pool, insert_channel};
+use feeds_lib::db::{self, insert_channel};
 use feeds_lib::feed::fetch_feed;
-use feeds_lib::models::{FeedChannel, User};
-use feeds_lib::schema::feed_channels::dsl::*;
-use feeds_lib::schema::feed_items::dsl::*;
-use feeds_lib::schema::subscribed_feed_items::dsl::*;
-use feeds_lib::schema::subscriptions::dsl::*;
-use feeds_lib::schema::users::dsl::*;
+use feeds_lib::models::FeedChannel;
 
 fn main() {
-  let userpass = "admin";
+  db::create_admin_user();
 
-  let pool = establish_pool();
-  let connection = pool.get().unwrap();
-
-  diesel::delete(subscriptions).execute(&*connection).unwrap();
-  diesel::delete(subscribed_feed_items)
-    .execute(&*connection)
-    .unwrap();
-  diesel::delete(feed_items).execute(&*connection).unwrap();
-  diesel::delete(feed_channels).execute(&*connection).unwrap();
-  diesel::delete(users).execute(&*connection).unwrap();
-
-  let pwh = hash_pw(&userpass);
-
-  let res = diesel::insert_into(users)
-    .values((username.eq(userpass), password_hash.eq(&pwh.as_bytes())))
-    .load::<User>(&*connection)
-    .expect("Error inserting to db");
-
-  println!("user: {:?}", res[0].id);
-
-  let uid = res[0].id;
-  let work = add_feed("http://feeds.bbci.co.uk/news/rss.xml".to_owned(), uid).and_then(move |_| {
-    add_feed(
-      "http://feeds.arstechnica.com/arstechnica/index".to_owned(),
-      uid,
-    )
-  });
+  let user = db::get_user("admin").unwrap();
+  let work =
+    add_feed("http://feeds.bbci.co.uk/news/rss.xml".to_owned(), user.id).and_then(move |_| {
+      add_feed(
+        "http://feeds.arstechnica.com/arstechnica/index".to_owned(),
+        user.id,
+      )
+    });
   tokio::run(work);
 }
 
@@ -75,13 +47,4 @@ fn add_feed(url: String, uid: i32) -> impl Future<Item = (), Error = ()> {
       db::subscribe_channel(&uid, &ch_id);
       Ok(())
     })
-}
-
-fn hash_pw(s: &str) -> String {
-  let mut hasher = Sha256::default();
-  hasher.input(s.as_bytes());
-  let output = hasher.result();
-  let hash = &output[..];
-  let e = encode(hash);
-  e
 }

@@ -1,0 +1,30 @@
+version: '3.6'
+services:
+  feeds-rs:
+    build: .
+    depends_on:
+      - db
+    volumes:
+      - ./docker-entrypoint.sh:/app/run.sh
+    command: sh /app/run.sh
+    ports:
+      - "80:4000"
+    environment:
+      - PG_USER=feeds
+      - PG_PASS=feeds123
+      - PG_DB=feeds
+      - DB_HOST=db
+      - ADMIN_PASS=admin
+      - JWT_SECRET=8jh676FU598hlQ
+      # - RUST_BACKTRACE=1
+  db:
+    image: postgres:10
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=feeds
+      - POSTGRES_PASSWORD=feeds123
+    volumes:
+      - pg-db:/var/lib/postgresql/data
+volumes:
+  pg-db:

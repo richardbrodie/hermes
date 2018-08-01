@@ -16,7 +16,8 @@ class AddFeed extends Component {
   }
 
   addFeed(feedUrl) {
-    var url = "http://localhost:4000/add_feed";
+    // var url = "http://localhost:4000/add_feed";
+    var url = "/add_feed";
     var body = JSON.stringify({
       feed_url: feedUrl,
     });

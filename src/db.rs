@@ -3,11 +3,12 @@ use diesel::dsl::exists;
 use diesel::prelude::*;
 use diesel::{self, select, PgConnection};
 use dotenv::dotenv;
-use models::{CompositeFeedItem, FeedChannel, FeedItem, SubscribedFeedItem, Subscription, User};
 use r2d2::{Pool, PooledConnection};
 use r2d2_diesel::ConnectionManager;
 use schema::{feed_channels, feed_items, subscriptions, users};
 use std::{env, thread};
+
+use models::{CompositeFeedItem, FeedChannel, FeedItem, SubscribedFeedItem, Subscription, User};
 
 #[derive(Insertable)]
 #[table_name = "feed_channels"]
@@ -51,8 +52,6 @@ impl<'a> NewItem<'a> {
 
 lazy_static! {
   static ref POOL: Pool<ConnectionManager<PgConnection>> = {
-    dotenv().ok();
-
     let pg_user = env::var("PG_USER").expect("PG_USER must be set");
     let pg_pass = env::var("PG_PASS").expect("PG_PASS must be set");
     let db_host = env::var("DB_HOST").expect("DB_HOST must be set");
@@ -69,6 +68,27 @@ lazy_static! {
 
 pub fn establish_pool() -> Pool<ConnectionManager<PgConnection>> {
   POOL.clone()
+}
+
+// seed admin user
+pub fn create_admin_user() {
+  use schema::users::dsl::*;
+
+  let pool = establish_pool();
+  let connection = pool.get().unwrap();
+
+  match select(exists(users.filter(username.eq("admin")))).get_result::<bool>(&*connection) {
+    Ok(true) => (),
+    Ok(false) => {
+      let admin_pass = env::var("ADMIN_PASS").expect("ADMIN_PASS must be set");
+      let pwh = User::hash_pw(&admin_pass);
+      diesel::insert_into(users)
+        .values((username.eq("admin"), password_hash.eq(&pwh.as_bytes())))
+        .load::<User>(&*connection)
+        .expect("Error creating admin user");
+    }
+    Err(_) => error!("could not check if admin user existed"),
+  }
 }
 
 // channels

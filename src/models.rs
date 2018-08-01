@@ -91,6 +91,15 @@ impl User {
     }
   }
 
+  pub fn hash_pw(s: &str) -> String {
+    let mut hasher = Sha256::default();
+    hasher.input(s.as_bytes());
+    let output = hasher.result();
+    let hash = &output[..];
+    let e = encode(hash);
+    e
+  }
+
   fn verifies(&self, pass: &str) -> bool {
     let orig_hash = decode(&self.password_hash).unwrap();
     let mut hasher = Sha256::default();

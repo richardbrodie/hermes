@@ -34,7 +34,8 @@ class Sidebar extends Component {
   }
 
   fetchData() {
-    const url = "http://localhost:4000/feeds";
+    // const url = "http://localhost:4000/feeds";
+    const url = "/feeds";
     var headers = new Headers({
       "Content-Type": "application/json",
       Authorization: "Bearer " + store.currentJWT

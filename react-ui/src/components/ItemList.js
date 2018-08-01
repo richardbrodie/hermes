@@ -48,7 +48,8 @@ class Items extends Component {
   }
 
   fetchData() {
-    var url = `http://localhost:4000/items/${this.state.id}`;
+    // var url = `http://localhost:4000/items/${this.state.id}`;
+    var url = `/items/${this.state.id}`;
     if (this.state.lastDate) {
       url = `${url}?updated=${this.state.lastDate}`
     }

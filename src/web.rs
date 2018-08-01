@@ -22,7 +22,7 @@ use feed;
 use models::{Claims, User};
 use router::Router;
 
-static ASSET_PATH: &'static str = "react-ui/build";
+static ASSET_PATH: &'static str = "react-ui";
 
 pub fn router() -> Router {
   let mut router = Router::build();
@@ -33,7 +33,6 @@ pub fn router() -> Router {
     .open_route(Method::GET, "/static/(.+)", show_asset)
     .open_route(Method::POST, "/authenticate", authenticate)
     .closed_route(Method::GET, "/feeds", index)
-    // .closed_route(Method::GET, r"/feed/(\d+)", show_channel)
     .closed_route(Method::GET, r"/item/(\d+)", show_item)
     .closed_route(Method::GET, r"/items/(\d+|\d+\?.*)", show_items)
     .closed_route(Method::POST, "/add_feed", add_feed);
@@ -41,7 +40,7 @@ pub fn router() -> Router {
 }
 
 pub fn start_web() {
-  let addr = "127.0.0.1:4000".parse().unwrap();
+  let addr = "0.0.0.0:4000".parse().unwrap();
 
   rt::spawn(future::lazy(move || {
     let service = move || {
@@ -51,8 +50,6 @@ pub fn start_web() {
     let server = Server::bind(&addr)
       .serve(service)
       .map_err(|e| eprintln!("server error: {}", e));
-
-    info!("server running on {:?}", addr);
     server
   }));
 }
