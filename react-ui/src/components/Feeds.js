@@ -1,5 +1,5 @@
 import React, { Component } from 'react';
-import { Route, Link } from 'react-router-dom';
+import { Route, NavLink } from 'react-router-dom';
 import 'react-notifications-component/dist/theme.css'
 
 import Topbar from './Topbar'
@@ -20,8 +20,8 @@ export default class Feeds extends Component {
         <Topbar />
         <nav id='feed-list'>
           {this.state.feeds.map((feed, i) =>
-            <div key={i}>
-              <Link to={`/feed/${feed.id}`} > {feed.title}</Link>
+            <div className="router-link" key={i}>
+              <NavLink to={`/feed/${feed.id}`} > {feed.title}</NavLink>
             </div>
           )}
         </nav >

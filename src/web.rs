@@ -21,6 +21,8 @@ use feed;
 use models::{Claims, User};
 use router::Router;
 
+static ASSET_PATH: &'static str = "react-ui/build";
+
 pub fn router() -> Router {
   let mut router = Router::build();
   router
@@ -88,7 +90,7 @@ fn add_feed(req: Request<Body>, claims: &Claims) -> ResponseFuture {
 }
 
 fn home(_req: Request<Body>) -> ResponseFuture {
-  let mut f = File::open("vue/dist/index.html").unwrap();
+  let mut f = File::open(format!("{}/index.html", ASSET_PATH)).unwrap();
   let mut buffer = String::new();
   f.read_to_string(&mut buffer).unwrap();
   Router::response(Body::from(buffer), StatusCode::OK)
@@ -219,7 +221,7 @@ fn show_asset(req: Request<Body>) -> ResponseFuture {
     }
   };
 
-  let f = path::Path::new("vue/dist/static").join(d);
+  let f = path::Path::new(&format!("{}/static", ASSET_PATH)).join(d);
 
   let response = tokio_fs::file::File::open(f)
     .and_then(|file| {

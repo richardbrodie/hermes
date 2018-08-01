@@ -21,8 +21,11 @@ class Items extends Component {
       <div id="feed-items">
         {this.state.items.map((item, i) =>
           < div key={i} className='feed-item' >
-            <span className='title'>{item.title}</span>
-            <span className='pub_date'>{item.published_at}</span>
+            <div className='title'>{item.title}</div>
+            <div className="extra">
+              {/* <span className='pub_date'>{item.published_at}</span> */}
+              <span className='desc'>{item.description}</span>
+            </div>
           </div >
         )}
       </div>
