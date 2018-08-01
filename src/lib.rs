@@ -1,4 +1,5 @@
 #![allow(unused)]
+extern crate base64;
 #[macro_use]
 extern crate diesel;
 extern crate chrono;
@@ -18,7 +19,7 @@ extern crate regex;
 extern crate rss;
 #[macro_use]
 extern crate serde_json;
-extern crate sodiumoxide;
+extern crate sha2;
 extern crate tokio;
 extern crate tokio_fs;
 extern crate tokio_io;

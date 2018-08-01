@@ -1,21 +1,25 @@
+extern crate base64;
 extern crate chrono;
 extern crate diesel;
 extern crate feeds_lib;
 extern crate futures;
 extern crate r2d2;
 extern crate r2d2_diesel;
-extern crate sodiumoxide;
+extern crate sha2;
 extern crate tokio;
 
+use base64::encode;
 use chrono::Utc;
 use diesel::prelude::*;
 use futures::prelude::*;
-use sodiumoxide::crypto::pwhash;
+use sha2::{Digest, Sha256};
+use std::str;
 
 use feeds_lib::db::{self, establish_pool, insert_channel};
 use feeds_lib::feed::fetch_feed;
 use feeds_lib::models::{FeedChannel, User};
 use feeds_lib::schema::feed_channels::dsl::*;
+use feeds_lib::schema::feed_items::dsl::*;
 use feeds_lib::schema::subscriptions::dsl::*;
 use feeds_lib::schema::users::dsl::*;
 
@@ -26,17 +30,14 @@ fn main() {
   let connection = pool.get().unwrap();
 
   diesel::delete(subscriptions).execute(&*connection).unwrap();
+  diesel::delete(feed_items).execute(&*connection).unwrap();
   diesel::delete(feed_channels).execute(&*connection).unwrap();
   diesel::delete(users).execute(&*connection).unwrap();
 
-  let pwh = pwhash::pwhash(
-    userpass.as_bytes(),
-    pwhash::OPSLIMIT_INTERACTIVE,
-    pwhash::MEMLIMIT_INTERACTIVE,
-  ).unwrap();
+  let pwh = hash_pw(&userpass);
 
   let res = diesel::insert_into(users)
-    .values((username.eq(userpass), password_hash.eq(&pwh[..])))
+    .values((username.eq(userpass), password_hash.eq(&pwh.as_bytes())))
     .load::<User>(&*connection)
     .expect("Error inserting to db");
 
@@ -64,4 +65,13 @@ fn add_feed(url: String, uid: i32) -> impl Future<Item = (), Error = ()> {
       db::subscribe(&uid, &ch_id);
       Ok(())
     })
+}
+
+fn hash_pw(s: &str) -> String {
+  let mut hasher = Sha256::default();
+  hasher.input(s.as_bytes());
+  let output = hasher.result();
+  let hash = &output[..];
+  let e = encode(hash);
+  e
 }

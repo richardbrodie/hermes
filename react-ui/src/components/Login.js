@@ -5,6 +5,11 @@ import store from './store'
 import '../styles/Login.css'
 
 class Login extends Component {
+  constructor(props) {
+    super(props)
+    this.handleSubmit = this.handleSubmit.bind(this);
+  }
+
   handleSubmit(event) {
     event.preventDefault();
     const formData = new FormData(event.target);
@@ -29,6 +34,7 @@ class Login extends Component {
       .then(resp => resp.json())
       .then(data => {
         store.setToken(data.token)
+        this.props.history.push('/')
       }).catch(error => {
         store.removeToken()
       });

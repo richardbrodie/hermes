@@ -1,5 +1,7 @@
+use base64::{decode, encode};
 use chrono::NaiveDateTime;
-use sodiumoxide::crypto::pwhash;
+use sha2::{Digest, Sha256};
+use std::str;
 
 use db::get_user;
 use schema::*;
@@ -55,8 +57,12 @@ impl User {
   }
 
   fn verifies(&self, pass: &str) -> bool {
-    let stored_hash = pwhash::HashedPassword::from_slice(&self.password_hash).unwrap();
-    pwhash::pwhash_verify(&stored_hash, pass.as_bytes())
+    let orig_hash = decode(&self.password_hash).unwrap();
+    let mut hasher = Sha256::default();
+    hasher.input(pass.as_bytes());
+    let output = hasher.result();
+    let hashed_pw = &output[..];
+    orig_hash == hashed_pw
   }
 }
 
