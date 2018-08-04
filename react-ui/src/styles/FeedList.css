@@ -1,0 +1,14 @@
+#feed-list {
+  padding-left: 0.5em;
+  grid-row: 2;
+  grid-column: 1;
+  color: white;
+}
+.router-link {
+  padding-bottom: 5px;
+  margin-bottom: 5px;
+  border-bottom: 1px solid #e6e5e5;
+}
+.router-link .active {
+  font-weight: 600;
+}

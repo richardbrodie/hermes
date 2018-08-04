@@ -18,14 +18,14 @@ extern crate r2d2_diesel;
 extern crate regex;
 extern crate rss;
 #[macro_use]
+extern crate serde_derive;
+#[macro_use]
 extern crate serde_json;
 extern crate sha2;
 extern crate tokio;
 extern crate tokio_fs;
 extern crate tokio_io;
 extern crate url;
-#[macro_use]
-extern crate serde_derive;
 
 pub mod db;
 pub mod feed;

@@ -1,6 +1,10 @@
 import React, { Component } from 'react';
+import { Link } from 'react-router-dom';
+import TimeAgo from 'react-timeago'
 
 import store from './store'
+
+import "../styles/ItemList.css"
 
 class Items extends Component {
   constructor(props) {
@@ -21,11 +25,9 @@ class Items extends Component {
       <div id="feed-items">
         {this.state.items.map((item, i) =>
           < div key={i} className='feed-item' >
-            <div className='title'>{item.title}</div>
-            <div className="extra">
-              {/* <span className='pub_date'>{item.published_at}</span> */}
-              <span className='desc'>{item.description}</span>
-            </div>
+            <Link className="title" to={{ pathname: '/item', state: { item: item } }}>{item.title}</Link>
+            <TimeAgo className='pub_date' date={item.published_at} minPeriod='30' />
+            <div className='desc'>{item.description}</div>
           </div >
         )}
       </div>

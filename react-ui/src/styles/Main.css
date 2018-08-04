@@ -1,0 +1,12 @@
+#main-view {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  grid-column-gap: 10px;
+}
+
+a {
+  text-decoration: none;
+  outline: 0;
+}
+
+

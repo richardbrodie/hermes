@@ -9,7 +9,6 @@ use schema::*;
 #[derive(Debug, Queryable, Associations, Identifiable, Serialize)]
 #[belongs_to(FeedChannel)]
 pub struct FeedItem {
-  #[serde(skip_serializing)]
   pub id: i32,
   #[serde(skip_serializing)]
   pub guid: String,

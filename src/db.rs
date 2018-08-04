@@ -57,7 +57,13 @@ lazy_static! {
   static ref POOL: Pool<ConnectionManager<PgConnection>> = {
     dotenv().ok();
 
-    let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+    let pg_user = env::var("PG_USER").expect("PG_USER must be set");
+    let pg_pass = env::var("PG_PASS").expect("PG_PASS must be set");
+    let db_host = env::var("DB_HOST").expect("DB_HOST must be set");
+    let pg_db = env::var("PG_DB").expect("PG_DB must be set");
+    let database_url = format!("postgres://{}:{}@{}/{}", pg_user, pg_pass, db_host, pg_db);
+    info!("database url: {}", database_url);
+
     let manager = ConnectionManager::<PgConnection>::new(database_url);
     Pool::builder()
       .build(manager)
@@ -68,16 +74,6 @@ lazy_static! {
 pub fn establish_pool() -> Pool<ConnectionManager<PgConnection>> {
   POOL.clone()
 }
-
-// pub fn establish_connection() -> Pool<ConnectionManager<PgConnection>> {
-//   dotenv().ok();
-
-//   let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-//   let manager = ConnectionManager::<PgConnection>::new(database_url);
-//   Pool::builder()
-//     .build(manager)
-//     .expect("Failed to create pool.")
-// }
 
 // channels
 

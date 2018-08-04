@@ -7,9 +7,6 @@ import registerServiceWorker from './registerServiceWorker';
 // mine
 import App from './components/App';
 
-// css
-import './styles/index.css';
-
 ReactDOM.render((
   <Router>
     <App />

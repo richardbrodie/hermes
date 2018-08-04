@@ -43,7 +43,13 @@ fn main() {
 
   println!("user: {:?}", res[0].id);
 
-  let work = add_feed("http://feeds.bbci.co.uk/news/rss.xml".to_owned(), res[0].id);
+  let uid = res[0].id;
+  let work = add_feed("http://feeds.bbci.co.uk/news/rss.xml".to_owned(), uid).and_then(move |_| {
+    add_feed(
+      "http://feeds.arstechnica.com/arstechnica/index".to_owned(),
+      uid,
+    )
+  });
   tokio::run(work);
 }
 

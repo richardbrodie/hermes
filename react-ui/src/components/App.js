@@ -2,7 +2,7 @@ import React, { Component } from 'react';
 import { Route, Switch, Redirect } from 'react-router-dom';
 import ReactNotification from "react-notifications-component";
 
-import Feeds from './Feeds'
+import Main from './Main'
 import Login from './Login'
 import store from './store'
 
@@ -55,7 +55,7 @@ class App extends Component {
         <ReactNotification ref={input => this.notificationDOMRef = input} />
         <Switch>
           <Route path="/login" component={Login} />
-          <PrivateRoute path="/" component={Feeds} />
+          <PrivateRoute path="/" component={Main} />
         </Switch>
       </div>
     )

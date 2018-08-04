@@ -1,13 +1,11 @@
 import React, { Component } from 'react';
-import { Route, NavLink } from 'react-router-dom';
-import 'react-notifications-component/dist/theme.css'
+import { NavLink } from 'react-router-dom';
 
-import Topbar from './Topbar'
-import Items from './Items'
 import store from './store'
-import "../styles/Feeds.css"
 
-export default class Feeds extends Component {
+import "../styles/FeedList.css"
+
+class FeedList extends Component {
   constructor(props) {
     super(props)
     this.state = { feeds: [] }
@@ -16,17 +14,13 @@ export default class Feeds extends Component {
 
   render() {
     return (
-      <div id="feed-view">
-        <Topbar />
-        <nav id='feed-list'>
-          {this.state.feeds.map((feed, i) =>
-            <div className="router-link" key={i}>
-              <NavLink to={`/feed/${feed.id}`} > {feed.title}</NavLink>
-            </div>
-          )}
-        </nav >
-        <Route path="/feed/:id" component={Items} />
-      </div>
+      <nav id='feed-list'>
+        {this.state.feeds.map((feed, i) =>
+          <div className="router-link" key={i}>
+            <NavLink to={`/feed/${feed.id}`} > {feed.title}</NavLink>
+          </div>
+        )}
+      </nav >
     )
   }
 
@@ -47,3 +41,4 @@ export default class Feeds extends Component {
   }
 }
 
+export default FeedList

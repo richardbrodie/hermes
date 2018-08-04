@@ -1,16 +1,12 @@
 import React, { Component } from 'react';
 import { Link } from 'react-router-dom';
-import SkyLight from 'react-skylight';
 
 import store from './store'
 
-class TopBar extends Component {
+class AddFeed extends Component {
   constructor(props) {
     super(props)
-    this.state = {
-      modalIsOpen: false
-    };
-    this.handleSubmit = this.handleSubmit.bind(this);
+    this.handleSubmit = this.handleSubmit.bind(this)
   }
 
   handleSubmit(event) {
@@ -49,20 +45,15 @@ class TopBar extends Component {
 
   render() {
     return (
-      <div id="top-bar" >
-        <div className="menuMainItem"><Link to='/' >Feeds.rs</Link></div>
-        <div className="menuItem">
-          <button onClick={() => this.simpleDialog.show()}>add feed</button>
-        </div>
-        <SkyLight hideOnOverlayClicked ref={ref => this.simpleDialog = ref} title="Add feed" >
-          <form onSubmit={this.handleSubmit}>
-            <input name="feed-url" type="text" placeholder="feed url" />
-            <button>add</button>
-          </form>
-        </SkyLight>
+      <div id="add-feed" >
+        <h2>Add feed</h2>
+        <form onSubmit={this.handleSubmit}>
+          <input name="feed-url" type="text" placeholder="feed url" />
+          <button>add</button>
+        </form>
       </div>
     )
   }
 }
 
-export default TopBar
+export default AddFeed

@@ -1,0 +1,14 @@
+#top-bar {
+  grid-row: 1;
+  grid-column: 1 / span 2;
+  padding: 0.5em;
+  background-color: #e2e1e1;
+}
+.menuMainItem {
+  width: 150px;
+  text-transform: uppercase;
+  float: left;
+  text-align: center;
+  cursor: pointer;
+  font-size: 1.3em;
+}
