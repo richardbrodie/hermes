@@ -1,6 +1,7 @@
 import React, { Component } from 'react';
 import { Link } from 'react-router-dom';
 import TimeAgo from 'react-timeago'
+import InfiniteScroll from 'react-infinite-scroller'
 
 import store from './store'
 
@@ -9,33 +10,46 @@ import "../styles/ItemList.css"
 class Items extends Component {
   constructor(props) {
     super(props)
-    this.state = { items: [] }
-    this.fetchData(props.match.params.id)
+    this.state = { items: [], id: props.match.params.id, lastDate: null, hasMore: true }
+    this.fetchData = this.fetchData.bind(this);
+    this.fetchData()
   }
 
-  componentDidUpdate(prevProps) {
-    let newid = this.props.match.params.id
-    if (prevProps.match.params.id !== newid) {
-      this.fetchData(newid)
+  componentDidUpdate(prevProps, prevState) {
+    if (prevProps.match.params.id !== this.props.match.params.id) {
+      this.setState({ items: [], id: this.props.match.params.id, lastDate: null })
+    }
+    if (prevState.id !== this.state.id) {
+      this.fetchData()
     }
   }
 
   render() {
+    var items = []
+    this.state.items.map((item, i) =>
+      items.push(
+        <div key={i} className='feed-item' >
+          <Link className="title" to={{ pathname: '/item', state: { item: item } }}>{item.title}</Link>
+          <TimeAgo className='pub_date' date={item.published_at} minPeriod='30' />
+          <div className='desc'>{item.description}</div>
+        </div >
+      )
+    )
+
     return (
       <div id="feed-items">
-        {this.state.items.map((item, i) =>
-          < div key={i} className='feed-item' >
-            <Link className="title" to={{ pathname: '/item', state: { item: item } }}>{item.title}</Link>
-            <TimeAgo className='pub_date' date={item.published_at} minPeriod='30' />
-            <div className='desc'>{item.description}</div>
-          </div >
-        )}
+        <InfiniteScroll pageStart={0} loadMore={this.fetchData} hasMore={true} initialLoad={false}>
+          {items}
+        </InfiniteScroll>
       </div>
     )
   }
 
-  fetchData(id) {
-    var url = `http://localhost:4000/items/${id}`;
+  fetchData() {
+    var url = `http://localhost:4000/items/${this.state.id}`;
+    if (this.state.lastDate) {
+      url = `${url}?updated=${this.state.lastDate}`
+    }
     var headers = new Headers({
       "Content-Type": "application/json",
       Authorization: "Bearer " + store.currentJWT
@@ -46,7 +60,21 @@ class Items extends Component {
     });
     fetch(req)
       .then(resp => resp.json())
-      .then(data => this.setState({ items: data }))
+      .then(data => {
+        let lastDate = data[data.length - 1].published_at
+        if (this.state.lastDate) {
+          this.setState((prevState, _props) => ({
+            lastDate: lastDate,
+            items: prevState.items.concat(data)
+          }));
+        }
+        else {
+          this.setState({
+            lastDate: lastDate,
+            items: data
+          });
+        }
+      })
       .catch(error => store.msgCallback('error', error, 'warning'))
   }
 }

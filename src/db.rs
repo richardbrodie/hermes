@@ -1,4 +1,4 @@
-use chrono::NaiveDateTime;
+use chrono::{DateTime, FixedOffset, NaiveDateTime};
 use diesel::dsl::exists;
 use diesel::prelude::*;
 use diesel::{self, select, PgConnection};
@@ -159,14 +159,19 @@ pub fn get_item(id: i32) -> Option<FeedItem> {
   }
 }
 
-pub fn get_items(id: i32) -> Vec<FeedItem> {
+pub fn get_items(id: i32, updated: Option<NaiveDateTime>) -> Vec<FeedItem> {
   let pool = establish_pool();
   let handle = thread::spawn(move || {
     let connection = pool.get().unwrap();
-    feed_items
+    let mut query = feed_items
       .filter(feed_items::feed_channel_id.eq(id))
+      .into_boxed();
+    if let Some(d) = updated {
+      query = query.filter(feed_items::published_at.lt(updated.unwrap()))
+    }
+    query
       .order(feed_items::published_at.desc())
-      .limit(5)
+      .limit(25)
       .load::<FeedItem>(&*connection)
       .expect("Error loading feeds")
   });

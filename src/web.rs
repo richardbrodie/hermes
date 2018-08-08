@@ -1,3 +1,4 @@
+use chrono::{DateTime, FixedOffset, NaiveDateTime};
 use futures::{future, Future, Stream};
 use hyper::header::{
   ACCESS_CONTROL_ALLOW_CREDENTIALS, ACCESS_CONTROL_ALLOW_HEADERS, ACCESS_CONTROL_ALLOW_METHODS,
@@ -32,9 +33,9 @@ pub fn router() -> Router {
     .open_route(Method::GET, "/static/(.+)", show_asset)
     .open_route(Method::POST, "/authenticate", authenticate)
     .closed_route(Method::GET, "/feeds", index)
-    .closed_route(Method::GET, r"/feed/(\d+)", show_channel)
+    // .closed_route(Method::GET, r"/feed/(\d+)", show_channel)
     .closed_route(Method::GET, r"/item/(\d+)", show_item)
-    .closed_route(Method::GET, r"/items/(\d+)", show_items)
+    .closed_route(Method::GET, r"/items/(\d+|\d+\?.*)", show_items)
     .closed_route(Method::POST, "/add_feed", add_feed);
   router
 }
@@ -142,26 +143,26 @@ fn authenticate(req: Request<Body>) -> ResponseFuture {
   Box::new(response)
 }
 
-fn show_channel(req: Request<Body>, claims: &Claims) -> ResponseFuture {
-  let req_path = req.uri().path();
-  let re = Regex::new(r"/feed/(\d+)").unwrap();
-  let ch_id = match re.captures(req_path) {
-    Some(d) => d.get(1).unwrap().as_str(),
-    None => return Router::response(Body::empty(), StatusCode::NOT_FOUND),
-  };
+// fn show_channel(req: Request<Body>, claims: &Claims) -> ResponseFuture {
+//   let req_path = req.uri().path();
+//   let re = Regex::new(r"/feed/(\d+)").unwrap();
+//   let ch_id = match re.captures(req_path) {
+//     Some(d) => d.get(1).unwrap().as_str(),
+//     None => return Router::response(Body::empty(), StatusCode::NOT_FOUND),
+//   };
 
-  let mut status = StatusCode::NOT_FOUND;
-  let mut body = Body::empty();
-  let data = get_items(ch_id.parse::<i32>().unwrap());
-  match serde_json::to_string(&data) {
-    Ok(json) => {
-      body = Body::from(json);
-      status = StatusCode::OK;
-    }
-    Err(_) => (),
-  };
-  Router::response(body, status)
-}
+//   let mut status = StatusCode::NOT_FOUND;
+//   let mut body = Body::empty();
+//   let data = get_items(ch_id.parse::<i32>().unwrap(), None);
+//   match serde_json::to_string(&data) {
+//     Ok(json) => {
+//       body = Body::from(json);
+//       status = StatusCode::OK;
+//     }
+//     Err(_) => (),
+//   };
+//   Router::response(body, status)
+// }
 
 fn show_item(req: Request<Body>, claims: &Claims) -> ResponseFuture {
   let req_path = req.uri().path();
@@ -202,7 +203,24 @@ fn show_items(req: Request<Body>, claims: &Claims) -> ResponseFuture {
 
   let mut body = Body::empty();
   let mut status = StatusCode::OK;
-  let data = get_items(ch_id.parse::<i32>().unwrap());
+
+  let updated = match req.uri().query() {
+    Some(s) => {
+      let params = form_urlencoded::parse(s.as_bytes())
+        .into_owned()
+        .collect::<HashMap<String, String>>();
+      match params.get("updated") {
+        Some(d) => match NaiveDateTime::parse_from_str(d, "%Y-%m-%dT%H:%M:%S") {
+          Ok(t) => Some(t),
+          Err(err) => return Router::response(body, StatusCode::BAD_REQUEST),
+        },
+        None => None,
+      }
+    }
+    None => None,
+  };
+
+  let data = get_items(ch_id.parse::<i32>().unwrap(), updated);
   match serde_json::to_string(&data) {
     Ok(json) => body = Body::from(json),
     Err(_) => status = StatusCode::NOT_FOUND,
