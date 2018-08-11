@@ -12,17 +12,17 @@ use tokio::timer::Interval;
 use url::Url;
 
 use db::{
-  self, find_duplicates, get_channel_urls, insert_channel, insert_items, subscribe, update_item,
-  NewItem,
+  self, find_duplicates, get_channel_urls_and_subscribers, insert_channel, insert_items,
+  insert_subscribed_items, subscribe, update_item, NewItem,
 };
 use models::FeedChannel;
 
 pub fn start_feed_loop() {
   let task = Interval::new(Instant::now(), Duration::from_secs(120))
     .for_each(|_| {
-      get_channel_urls().into_iter().for_each(|c| {
-        update_feed(c.0, c.1);
-      });
+      get_channel_urls_and_subscribers()
+        .into_iter()
+        .for_each(|c| update_feed(c.0, c.1, c.2));
       Ok(())
     })
     .map_err(|e| panic!("delay errored; err={:?}", e));
@@ -60,12 +60,13 @@ pub fn add_feed(url: String) -> impl Future<Item = i32, Error = ()> {
     })
 }
 
-pub fn update_feed(channel_id: i32, channel_url: String) {
+pub fn update_feed(channel_id: i32, channel_url: String, subscribers: Vec<i32>) {
   let work = fetch_feed(channel_url).and_then(move |feed| {
     let items: Vec<NewItem> = process_items(feed.items(), &channel_id);
     let new_items = process_duplicates(items);
     if new_items.len() > 0 {
-      insert_items(&new_items);
+      let inserted_items = insert_items(&new_items);
+      prepare_subscribed_items(inserted_items, subscribers);
     }
     Ok(())
   });
@@ -74,6 +75,19 @@ pub fn update_feed(channel_id: i32, channel_url: String) {
 }
 
 // internal
+
+fn prepare_subscribed_items(inserted_items: Vec<i32>, subscribers: Vec<i32>) {
+  let insertables: Vec<(&i32, &i32, bool)> = subscribers
+    .iter()
+    .flat_map(|s| {
+      inserted_items
+        .iter()
+        .map(move |i| (s, i, false))
+        .collect::<Vec<(&i32, &i32, bool)>>()
+    })
+    .collect::<Vec<(&i32, &i32, bool)>>();
+  insert_subscribed_items(insertables);
+}
 
 pub fn fetch_feed(url: String) -> impl Future<Item = Channel, Error = ()> {
   let https = HttpsConnector::new(2).expect("TLS initialization failed");

@@ -1,5 +1,5 @@
 import React, { Component } from 'react';
-import { Route } from 'react-router-dom';
+import { Route, Switch } from 'react-router-dom';
 import 'react-notifications-component/dist/theme.css'
 
 import AddFeed from './AddFeed'
@@ -17,9 +17,11 @@ export default class Main extends Component {
         <TopBar />
         <FeedList />
 
-        <Route path="/feed/:id" component={ItemList} />
-        <Route path="/add" component={AddFeed} />
-        <Route path="/item" render={(props) => <SingleItem {...props} />} />
+        <Switch>
+          <Route path="/feed/:id" component={ItemList} />
+          <Route path="/add" component={AddFeed} />
+          <Route path="/item" render={(props) => <SingleItem {...props} />} />
+        </Switch>
       </div>
     )
   }

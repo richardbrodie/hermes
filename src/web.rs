@@ -17,7 +17,7 @@ use tokio_fs;
 use tokio_io;
 use url::form_urlencoded;
 
-use db::{self, get_channels, get_item, get_items};
+use db::{self, get_subscribed_channels, get_subscribed_item, get_subscribed_items};
 use feed;
 use models::{Claims, User};
 use router::Router;
@@ -99,7 +99,7 @@ fn home(_req: Request<Body>) -> ResponseFuture {
 
 fn index(_req: Request<Body>, claims: &Claims) -> ResponseFuture {
   let user_id = claims.id.clone();
-  let channels = db::get_subscribed_channels(&user_id);
+  let channels = get_subscribed_channels(&user_id);
   let mut body = Body::empty();
   let mut status = StatusCode::NOT_FOUND;
   match serde_json::to_string(&channels) {
@@ -168,16 +168,17 @@ fn show_item(req: Request<Body>, claims: &Claims) -> ResponseFuture {
   let req_path = req.uri().path();
   let re = Regex::new(r"/item/(\d+)").unwrap();
   let ch_id = match re.captures(req_path) {
-    Some(d) => d.get(1).unwrap().as_str(),
+    Some(d) => d.get(1).unwrap().as_str().parse::<i32>().unwrap(),
     None => {
       info!("no match: {}", req_path);
       return Router::response(Body::empty(), StatusCode::BAD_REQUEST);
     }
   };
 
+  let user_id = claims.id.clone();
   let mut status = StatusCode::OK;
   let mut body = Body::empty();
-  match get_item(ch_id.parse::<i32>().unwrap()) {
+  match get_subscribed_item(ch_id, user_id) {
     Some(data) => match serde_json::to_string(&data) {
       Ok(json) => {
         body = Body::from(json);
@@ -194,13 +195,14 @@ fn show_items(req: Request<Body>, claims: &Claims) -> ResponseFuture {
   let req_path = req.uri().path();
   let re = Regex::new(r"/items/(\d+)").unwrap();
   let ch_id = match re.captures(req_path) {
-    Some(d) => d.get(1).unwrap().as_str(),
+    Some(d) => d.get(1).unwrap().as_str().parse::<i32>().unwrap(),
     None => {
       info!("no match: {}", req_path);
       return Box::new(future::ok(Response::new(Body::empty())));
     }
   };
 
+  let user_id = claims.id.clone();
   let mut body = Body::empty();
   let mut status = StatusCode::OK;
 
@@ -220,7 +222,7 @@ fn show_items(req: Request<Body>, claims: &Claims) -> ResponseFuture {
     None => None,
   };
 
-  let data = get_items(ch_id.parse::<i32>().unwrap(), updated);
+  let data = get_subscribed_items(ch_id, user_id, updated);
   match serde_json::to_string(&data) {
     Ok(json) => body = Body::from(json),
     Err(_) => status = StatusCode::NOT_FOUND,

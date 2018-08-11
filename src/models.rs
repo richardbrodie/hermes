@@ -22,6 +22,18 @@ pub struct FeedItem {
   pub content: Option<String>,
 }
 
+#[derive(Debug, Queryable, Identifiable, Serialize)]
+pub struct SubscribedFeedItem {
+  pub id: i32,
+  pub title: String,
+  pub link: String,
+  pub description: String,
+  pub published_at: NaiveDateTime,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub content: Option<String>,
+  pub seen: bool,
+}
+
 #[derive(Debug, Queryable, Associations, Identifiable, Serialize)]
 pub struct FeedChannel {
   pub id: i32,
@@ -32,8 +44,20 @@ pub struct FeedChannel {
   pub updated_at: NaiveDateTime,
 }
 
-#[derive(Debug, Queryable, Associations, Serialize)]
+// #[derive(Debug, Queryable, Associations, Identifiable, Serialize)]
+// pub struct SubscribedFeedChannel {
+//   pub id: i32,
+//   pub title: String,
+//   pub site_link: String,
+//   pub feed_link: String,
+//   pub description: String,
+//   pub updated_at: NaiveDateTime,
+// }
+
+#[derive(Debug, Queryable, Associations, Identifiable, Serialize)]
+#[belongs_to(FeedChannel)]
 pub struct Subscription {
+  pub id: i32,
   pub user_id: i32,
   pub feed_channel_id: i32,
 }
