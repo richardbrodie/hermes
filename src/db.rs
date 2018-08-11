@@ -3,7 +3,7 @@ use diesel::dsl::exists;
 use diesel::prelude::*;
 use diesel::{self, select, PgConnection};
 use dotenv::dotenv;
-use models::{FeedChannel, FeedItem, SubscribedFeedItem, Subscription, User};
+use models::{CompositeFeedItem, FeedChannel, FeedItem, SubscribedFeedItem, Subscription, User};
 use r2d2::{Pool, PooledConnection};
 use r2d2_diesel::ConnectionManager;
 use schema::{feed_channels, feed_items, subscriptions, users};
@@ -164,7 +164,6 @@ pub fn update_item(iid: i32, item: &NewItem) {
   use schema::feed_items::dsl::*;
 
   let pool = establish_pool();
-  // let handle = thread::spawn(move || {
   let connection = pool.get().unwrap();
   diesel::update(feed_items.find(iid))
     .set((
@@ -176,8 +175,6 @@ pub fn update_item(iid: i32, item: &NewItem) {
     ))
     .execute(&*connection)
     .expect(&format!("Error updating item {} with {:?}", iid, item));
-  // });
-  // handle.join().unwrap()
 }
 
 pub fn find_duplicates(guids: Vec<&str>) -> Option<Vec<(i32, String, NaiveDateTime)>> {
@@ -269,7 +266,7 @@ pub fn get_subscribed_items(
   fid: i32,
   uid: i32,
   updated: Option<NaiveDateTime>,
-) -> Option<Vec<SubscribedFeedItem>> {
+) -> Option<Vec<CompositeFeedItem>> {
   use schema::feed_items;
   use schema::subscribed_feed_items;
 
@@ -290,44 +287,54 @@ pub fn get_subscribed_items(
       .select((
         feed_items::id,
         feed_items::title,
-        feed_items::link,
         feed_items::description,
         feed_items::published_at,
-        feed_items::content,
         subscribed_feed_items::seen,
       ))
-      .load::<SubscribedFeedItem>(&*connection)
+      .load::<(i32, String, String, NaiveDateTime, bool)>(&*connection)
     {
-      Ok(items) => Some(items),
+      Ok(items) => Some(
+        items
+          .iter()
+          .map(|i| CompositeFeedItem::partial(i))
+          .collect(),
+      ),
       Err(_) => None,
     }
   });
   handle.join().unwrap()
 }
 
-pub fn get_subscribed_item(iid: i32, uid: i32) -> Option<SubscribedFeedItem> {
+pub fn get_subscribed_item(iid: i32, uid: i32) -> Option<CompositeFeedItem> {
   use schema::feed_items;
   use schema::subscribed_feed_items;
 
   let pool = establish_pool();
   let handle = thread::spawn(move || {
     let connection = pool.get().unwrap();
-    match feed_items::table
-      .inner_join(subscribed_feed_items::table)
-      .filter(subscribed_feed_items::feed_item_id.eq(iid))
+
+    let item = feed_items::table
+      .find(iid)
+      .first::<FeedItem>(&*connection)
+      .unwrap();
+    let subscribed = SubscribedFeedItem::belonging_to(&item)
       .filter(subscribed_feed_items::user_id.eq(uid))
-      .select((
-        feed_items::id,
-        feed_items::title,
-        feed_items::link,
-        feed_items::description,
-        feed_items::published_at,
-        feed_items::content,
-        subscribed_feed_items::seen,
-      ))
-      .first::<SubscribedFeedItem>(&*connection)
-    {
-      Ok(item) => Some(item),
+      .first::<SubscribedFeedItem>(&*connection);
+    match subscribed {
+      Ok(s) => {
+        diesel::update(&s)
+          .set(subscribed_feed_items::seen.eq(true))
+          .execute(&*connection);
+        Some(CompositeFeedItem {
+          item_id: item.id,
+          title: item.title,
+          link: Some(item.link),
+          description: item.description,
+          published_at: item.published_at,
+          content: item.content,
+          seen: true,
+        })
+      }
       Err(_) => None,
     }
   });
@@ -402,6 +409,23 @@ pub fn insert_subscribed_items(items: Vec<(&i32, &i32, bool)>) {
 //       .limit(25)
 //       .load::<FeedItem>(&*connection)
 //       .expect("Error loading feeds")
+//   });
+//   handle.join().unwrap()
+// }
+
+// pub fn mark_item_seen(iid: i32, uid: i32) {
+//   use schema::subscribed_feed_items;
+
+//   let pool = establish_pool();
+//   let handle = thread::spawn(move || {
+//     let connection = pool.get().unwrap();
+
+//     diesel::update(
+//       subscribed_feed_items::table
+//         .filter(subscribed_feed_items::feed_item_id.eq(iid))
+//         .filter(subscribed_feed_items::user_id.eq(uid)),
+//     ).set(subscribed_feed_items::seen.eq(true))
+//       .execute(&*connection);
 //   });
 //   handle.join().unwrap()
 // }

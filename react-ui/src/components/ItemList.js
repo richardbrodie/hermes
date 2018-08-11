@@ -28,7 +28,7 @@ class Items extends Component {
     var items = []
     this.state.items.map((item, i) =>
       items.push(
-        <div key={i} className='feed-item' >
+        <div key={i} className={`feed-item seen_${item.seen}`} >
           <Link className="title" to={{ pathname: '/item', state: { item: item } }}>{item.title}</Link>
           <TimeAgo className='pub_date' date={item.published_at} minPeriod='30' />
           <div className='desc'>{item.description}</div>

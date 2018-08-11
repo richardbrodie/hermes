@@ -167,7 +167,7 @@ fn authenticate(req: Request<Body>) -> ResponseFuture {
 fn show_item(req: Request<Body>, claims: &Claims) -> ResponseFuture {
   let req_path = req.uri().path();
   let re = Regex::new(r"/item/(\d+)").unwrap();
-  let ch_id = match re.captures(req_path) {
+  let item_id = match re.captures(req_path) {
     Some(d) => d.get(1).unwrap().as_str().parse::<i32>().unwrap(),
     None => {
       info!("no match: {}", req_path);
@@ -178,7 +178,7 @@ fn show_item(req: Request<Body>, claims: &Claims) -> ResponseFuture {
   let user_id = claims.id.clone();
   let mut status = StatusCode::OK;
   let mut body = Body::empty();
-  match get_subscribed_item(ch_id, user_id) {
+  match get_subscribed_item(item_id, user_id) {
     Some(data) => match serde_json::to_string(&data) {
       Ok(json) => {
         body = Body::from(json);

@@ -5,7 +5,7 @@
 .feed-item {
   border-bottom: 1px solid #e6e5e5;
 }
-.feed-item .title {
+.seen_false {
   font-weight: 600;
 }
 .pub_date {

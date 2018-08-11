@@ -1,13 +1,16 @@
 import React, { Component } from 'react';
 import TimeAgo from 'react-timeago'
 
+import store from './store'
+
 import "../styles/SingleItem.css"
 
 class SingleItem extends Component {
   constructor(props) {
     super(props)
-    console.log(props.location.state.item)
     this.state = { item: props.location.state.item }
+    this.fetchData = this.fetchData.bind(this);
+    this.fetchData()
   }
   render() {
     return (
@@ -18,6 +21,24 @@ class SingleItem extends Component {
         <p dangerouslySetInnerHTML={{ __html: this.state.item.content }}></p>
       </div>
     )
+  }
+
+  fetchData() {
+    var url = `http://localhost:4000/item/${this.state.item.item_id}`;
+    var headers = new Headers({
+      "Content-Type": "application/json",
+      Authorization: "Bearer " + store.currentJWT
+    });
+    var req = new Request(url, {
+      method: "GET",
+      headers: headers
+    });
+    fetch(req)
+      .then(resp => resp.json())
+      .then(data => {
+        this.setState({ item: data });
+      })
+      .catch(error => store.msgCallback('error', error, 'warning'))
   }
 }
 

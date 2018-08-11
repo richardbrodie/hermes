@@ -22,16 +22,38 @@ pub struct FeedItem {
   pub content: Option<String>,
 }
 
-#[derive(Debug, Queryable, Identifiable, Serialize)]
+#[derive(Debug, Queryable, Associations, Identifiable, Serialize, AsChangeset)]
+#[belongs_to(FeedItem)]
 pub struct SubscribedFeedItem {
   pub id: i32,
+  pub feed_item_id: i32,
+  pub user_id: i32,
+  pub seen: bool,
+}
+
+#[derive(Debug, Queryable, Serialize)]
+pub struct CompositeFeedItem {
+  pub item_id: i32,
   pub title: String,
-  pub link: String,
+  pub link: Option<String>,
   pub description: String,
   pub published_at: NaiveDateTime,
   #[serde(skip_serializing_if = "Option::is_none")]
   pub content: Option<String>,
   pub seen: bool,
+}
+impl CompositeFeedItem {
+  pub fn partial(item: &(i32, String, String, NaiveDateTime, bool)) -> Self {
+    CompositeFeedItem {
+      item_id: item.0,
+      title: item.1.to_string(),
+      link: None,
+      description: item.2.to_string(),
+      published_at: item.3,
+      content: None,
+      seen: item.4,
+    }
+  }
 }
 
 #[derive(Debug, Queryable, Associations, Identifiable, Serialize)]
@@ -43,16 +65,6 @@ pub struct FeedChannel {
   pub description: String,
   pub updated_at: NaiveDateTime,
 }
-
-// #[derive(Debug, Queryable, Associations, Identifiable, Serialize)]
-// pub struct SubscribedFeedChannel {
-//   pub id: i32,
-//   pub title: String,
-//   pub site_link: String,
-//   pub feed_link: String,
-//   pub description: String,
-//   pub updated_at: NaiveDateTime,
-// }
 
 #[derive(Debug, Queryable, Associations, Identifiable, Serialize)]
 #[belongs_to(FeedChannel)]
