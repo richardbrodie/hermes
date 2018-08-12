@@ -1,6 +1,5 @@
 html {
-  background: white;
-  text-rendering: geometricPrecision;
+  text-rendering: optimizeLegibility;
   font-family: "Open Sans", sans-serif;
   font-feature-settings: "dlig", "liga", "lnum", "kern";
   line-height: 1.5em;

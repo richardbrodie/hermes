@@ -3,10 +3,9 @@ import { Route, Switch } from 'react-router-dom';
 import 'react-notifications-component/dist/theme.css'
 
 import AddFeed from './AddFeed'
-import TopBar from './TopBar'
 import ItemList from './ItemList'
-import FeedList from './FeedList'
 import SingleItem from './SingleItem'
+import Sidebar from './Sidebar'
 
 import "../styles/Main.css"
 
@@ -14,8 +13,7 @@ export default class Main extends Component {
   render() {
     return (
       <div id="main-view">
-        <TopBar />
-        <FeedList />
+        <Sidebar />
 
         <Switch>
           <Route path="/feed/:id" component={ItemList} />

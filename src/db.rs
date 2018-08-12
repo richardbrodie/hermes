@@ -283,7 +283,7 @@ pub fn get_subscribed_items(
       query = query.filter(feed_items::published_at.lt(updated.unwrap()))
     }
     match query
-      .limit(25)
+      .limit(50)
       .select((
         feed_items::id,
         feed_items::title,
