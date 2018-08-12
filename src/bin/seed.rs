@@ -20,6 +20,7 @@ use feeds_lib::feed::fetch_feed;
 use feeds_lib::models::{FeedChannel, User};
 use feeds_lib::schema::feed_channels::dsl::*;
 use feeds_lib::schema::feed_items::dsl::*;
+use feeds_lib::schema::subscribed_feed_items::dsl::*;
 use feeds_lib::schema::subscriptions::dsl::*;
 use feeds_lib::schema::users::dsl::*;
 
@@ -30,6 +31,9 @@ fn main() {
   let connection = pool.get().unwrap();
 
   diesel::delete(subscriptions).execute(&*connection).unwrap();
+  diesel::delete(subscribed_feed_items)
+    .execute(&*connection)
+    .unwrap();
   diesel::delete(feed_items).execute(&*connection).unwrap();
   diesel::delete(feed_channels).execute(&*connection).unwrap();
   diesel::delete(users).execute(&*connection).unwrap();
@@ -68,7 +72,7 @@ fn add_feed(url: String, uid: i32) -> impl Future<Item = (), Error = ()> {
       Ok(channel.id)
     })
     .and_then(move |ch_id| {
-      db::subscribe(&uid, &ch_id);
+      db::subscribe_channel(&uid, &ch_id);
       Ok(())
     })
 }

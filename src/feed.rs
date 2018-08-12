@@ -13,7 +13,7 @@ use url::Url;
 
 use db::{
   self, find_duplicates, get_channel_urls_and_subscribers, insert_channel, insert_items,
-  insert_subscribed_items, subscribe, update_item, NewItem,
+  insert_subscribed_items, subscribe_channel, update_item, NewItem,
 };
 use models::FeedChannel;
 
@@ -34,12 +34,23 @@ pub fn subscribe_feed(url: String, uid: i32) {
   rt::spawn(future::lazy(move || {
     db::get_channel_id(&url)
       .into_future()
+      .and_then(|cid| Ok((cid, db::get_item_ids(&cid))))
       .or_else(|_| add_feed(url))
-      .and_then(move |c| Ok(subscribe(&uid, &c)))
+      .and_then(move |(ch_id, item_ids)| {
+        subscribe_channel(&uid, &ch_id);
+        Ok(item_ids)
+      })
+      .and_then(move |ids| {
+        Ok(match ids {
+          Some(items) => prepare_subscribed_items(items, vec![uid]),
+          None => (),
+        })
+      })
   }));
 }
 
-pub fn add_feed(url: String) -> impl Future<Item = i32, Error = ()> {
+// internal
+pub fn add_feed(url: String) -> impl Future<Item = (i32, Option<Vec<i32>>), Error = ()> {
   fetch_feed(url.to_string())
     .and_then(move |feed| {
       let mut channel = FeedChannel {
@@ -55,8 +66,7 @@ pub fn add_feed(url: String) -> impl Future<Item = i32, Error = ()> {
     })
     .and_then(move |(feed, channel_id)| {
       let items: Vec<NewItem> = process_items(feed.items(), &channel_id);
-      insert_items(&items);
-      Ok(channel_id)
+      Ok((channel_id, insert_items(&items)))
     })
 }
 
@@ -65,8 +75,10 @@ pub fn update_feed(channel_id: i32, channel_url: String, subscribers: Vec<i32>) 
     let items: Vec<NewItem> = process_items(feed.items(), &channel_id);
     let new_items = process_duplicates(items);
     if new_items.len() > 0 {
-      let inserted_items = insert_items(&new_items);
-      prepare_subscribed_items(inserted_items, subscribers);
+      match insert_items(&new_items) {
+        Some(inserted_items) => prepare_subscribed_items(inserted_items, subscribers),
+        None => (),
+      }
     }
     Ok(())
   });

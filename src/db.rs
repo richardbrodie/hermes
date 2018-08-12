@@ -148,16 +148,18 @@ pub fn get_channel_urls_and_subscribers() -> Vec<(i32, String, Vec<i32>)> {
 
 //items
 
-pub fn insert_items(items: &Vec<NewItem>) -> Vec<i32> {
+pub fn insert_items(items: &Vec<NewItem>) -> Option<Vec<i32>> {
   use schema::feed_items;
 
   let pool = establish_pool();
   let connection = pool.get().unwrap();
-  let inserted_items = diesel::insert_into(feed_items::table)
+  match diesel::insert_into(feed_items::table)
     .values(items)
     .get_results::<FeedItem>(&*connection)
-    .expect("Error saving new post");
-  inserted_items.into_iter().map(|i| i.id).collect()
+  {
+    Ok(items) => Some(items.into_iter().map(|i| i.id).collect()),
+    Err(_) => None,
+  }
 }
 
 pub fn update_item(iid: i32, item: &NewItem) {
@@ -193,6 +195,20 @@ pub fn find_duplicates(guids: Vec<&str>) -> Option<Vec<(i32, String, NaiveDateTi
   }
 }
 
+pub fn get_item_ids(fid: &i32) -> Option<Vec<i32>> {
+  use schema::feed_items::dsl::*;
+  let pool = establish_pool();
+  let connection = pool.get().unwrap();
+  match feed_items
+    .filter(feed_channel_id.eq(fid))
+    .select(id)
+    .load(&*connection)
+  {
+    Ok(i) => Some(i),
+    Err(_) => None,
+  }
+}
+
 pub fn get_latest_item_date(channel_id: i32) -> Option<NaiveDateTime> {
   use schema::feed_items::dsl::*;
 
@@ -223,19 +239,16 @@ pub fn get_user(uname: &str) -> Option<User> {
 
 // subscriptions
 
-pub fn subscribe(uid: &i32, fid: &i32) {
+pub fn subscribe_channel(uid: &i32, fid: &i32) {
   use schema::subscriptions::dsl::*;
 
   let pool = establish_pool();
   let connection = pool.get().unwrap();
 
-  match diesel::insert_into(subscriptions)
+  diesel::insert_into(subscriptions)
     .values((feed_channel_id.eq(fid), user_id.eq(uid)))
     .execute(&*connection)
-  {
-    Ok(r) => (),
-    Err(e) => error!("res: {:?}", e),
-  }
+    .expect("Error subscribing");
 }
 
 pub fn get_subscribed_channels(uid: &i32) -> Option<Vec<FeedChannel>> {
