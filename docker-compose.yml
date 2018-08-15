@@ -1,14 +1,11 @@
-version: '3.6'
+version: "3.6"
 services:
   feeds-rs:
     build: .
     depends_on:
       - db
-    volumes:
-      - ./docker-entrypoint.sh:/app/run.sh
-    command: sh /app/run.sh
     ports:
-      - "80:4000"
+      - "4000:4000"
     environment:
       - PG_USER=feeds
       - PG_PASS=feeds123
