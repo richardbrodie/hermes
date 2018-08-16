@@ -94,7 +94,7 @@ impl Router {
         };
       }
     }
-    info!("not found");
+    warn!("'{}' not found", path);
     Router::throw_code(StatusCode::NOT_FOUND)
   }
 

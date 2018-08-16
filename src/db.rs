@@ -265,10 +265,13 @@ pub fn subscribe_channel(uid: &i32, fid: &i32) {
   let pool = establish_pool();
   let connection = pool.get().unwrap();
 
-  diesel::insert_into(subscriptions)
+  match diesel::insert_into(subscriptions)
     .values((feed_channel_id.eq(fid), user_id.eq(uid)))
     .execute(&*connection)
-    .expect("Error subscribing");
+  {
+    Ok(_) => info!("subscribed: '{}' by '{}'", fid, uid),
+    Err(e) => error!("subscribe failure: '{}' by '{}': {}", fid, uid, e),
+  };
 }
 
 pub fn get_subscribed_channels(uid: &i32) -> Option<Vec<FeedChannel>> {

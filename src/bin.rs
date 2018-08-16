@@ -6,6 +6,7 @@ extern crate feeds_lib;
 
 use dotenv::dotenv;
 use hyper::rt;
+use std::env;
 
 use feeds_lib::db::create_admin_user;
 use feeds_lib::feed::start_feed_loop;
@@ -13,7 +14,7 @@ use feeds_lib::web::start_web;
 
 fn main() {
   dotenv().ok();
-  // env::set_var("RUST_LOG", "feeds=debug");
+  env::set_var("RUST_LOG", "feeds=debug");
   pretty_env_logger::init();
 
   create_admin_user();

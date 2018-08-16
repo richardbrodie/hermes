@@ -31,11 +31,18 @@ pub fn start_feed_loop() {
 }
 
 pub fn subscribe_feed(url: String, uid: i32) {
+  debug!("subscribing: '{}' by '{}'", url, uid);
   rt::spawn(future::lazy(move || {
     db::get_channel_id(&url)
       .into_future()
-      .and_then(|cid| Ok((cid, db::get_item_ids(&cid))))
-      .or_else(|_| add_feed(url))
+      .and_then(|cid| {
+        debug!("in db: '{}'", cid);
+        Ok((cid, db::get_item_ids(&cid)))
+      })
+      .or_else(|_| {
+        debug!("not in db: '{}'", url);
+        add_feed(url)
+      })
       .and_then(move |(ch_id, item_ids)| {
         subscribe_channel(&uid, &ch_id);
         Ok(item_ids)
@@ -102,20 +109,29 @@ fn prepare_subscribed_items(inserted_items: Vec<i32>, subscribers: Vec<i32>) {
 }
 
 pub fn fetch_feed(url: String) -> impl Future<Item = Channel, Error = ()> {
+  debug!("fetching: '{}'", url);
   let https = HttpsConnector::new(2).expect("TLS initialization failed");
   let client = Client::builder().build::<_, Body>(https);
+  let local = url.to_owned();
   client
     .get(url.parse().unwrap())
-    .map_err(|_err| ())
-    .and_then(|res| {
+    .map_err(move |err| error!("could not fetch: '{}': {}", url, err))
+    .and_then(move |res| {
+      debug!("fetched: '{}'", local);
       res
         .into_body()
         .concat2()
         .map_err(|_err| ())
         .and_then(
-          |body| match Channel::read_from(BufReader::new(&body as &[u8])) {
-            Ok(channel) => Ok(channel),
-            Err(_e) => Err(()),
+          move |body| match Channel::read_from(BufReader::new(&body as &[u8])) {
+            Ok(channel) => {
+              debug!("parsed: '{}'", local);
+              Ok(channel)
+            }
+            Err(e) => {
+              error!("failed to parse: {}", e);
+              Err(())
+            }
           },
         )
     })

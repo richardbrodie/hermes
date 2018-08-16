@@ -22,7 +22,7 @@ use feed;
 use models::{Claims, User};
 use router::Router;
 
-static ASSET_PATH: &'static str = "react-ui";
+static ASSET_PATH: &'static str = "react-ui/build";
 
 pub fn router() -> Router {
   let mut router = Router::build();
@@ -49,7 +49,7 @@ pub fn start_web() {
     };
     let server = Server::bind(&addr)
       .serve(service)
-      .map_err(|e| eprintln!("server error: {}", e));
+      .map_err(|e| error!("server error: {}", e));
     server
   }));
 }
@@ -71,7 +71,7 @@ fn add_feed(req: Request<Body>, claims: &Claims) -> ResponseFuture {
     match params.get("feed_url") {
       Some(n) => {
         if !n.is_empty() {
-          info!("feed: {:?}", n);
+          debug!("feed_url: {}", n);
           feed::subscribe_feed(n.to_owned(), user_id);
           status = StatusCode::OK;
         }
@@ -230,18 +230,19 @@ fn show_items(req: Request<Body>, claims: &Claims) -> ResponseFuture {
 fn show_asset(req: Request<Body>) -> ResponseFuture {
   let req_path = req.uri().path();
   let re = Regex::new(r"/static/(.+)").unwrap();
-  let d = match re.captures(req_path) {
+  let asset_name = match re.captures(&req_path) {
     Some(d) => d.get(1).unwrap().as_str(),
     None => {
-      info!("no param match");
+      warn!("no param match");
       return Router::response(Body::empty(), StatusCode::NOT_FOUND);
     }
   };
 
-  let f = path::Path::new(&format!("{}/static", ASSET_PATH)).join(d);
+  let asset_dir = format!("{}/static", ASSET_PATH);
+  let asset_path = path::Path::new(&asset_dir).join(asset_name);
 
-  let response = tokio_fs::file::File::open(f)
-    .and_then(|file| {
+  let response = tokio_fs::file::File::open(asset_path)
+    .and_then(move |file| {
       let buf: Vec<u8> = Vec::new();
       tokio_io::io::read_to_end(file, buf)
         .and_then(|item| Ok(Response::new(item.1.into())))
@@ -254,8 +255,9 @@ fn show_asset(req: Request<Body>) -> ResponseFuture {
           )
         })
     })
-    .or_else(|_| {
-      info!("not found!");
+    .or_else(|e| {
+      // warn!("{} not found in {}! - {}", asset_name, asset_dir, e);
+      warn!("not found! - {}", e);
       Ok(
         Response::builder()
           .status(StatusCode::NOT_FOUND)
