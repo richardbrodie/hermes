@@ -13,9 +13,9 @@ use url::Url;
 
 use db::{
   self, find_duplicates, get_channel_urls_and_subscribers, insert_channel, insert_items,
-  insert_subscribed_items, subscribe_channel, update_item, NewItem,
+  insert_subscribed_items, subscribe_channel, update_item,
 };
-use models::FeedChannel;
+use models::{self, NewItem};
 
 pub fn start_feed_loop() {
   let task = Interval::new(Instant::now(), Duration::from_secs(120))
@@ -60,16 +60,15 @@ pub fn subscribe_feed(url: String, uid: i32) {
 pub fn add_feed(url: String) -> impl Future<Item = (i32, Option<Vec<i32>>), Error = ()> {
   fetch_feed(url.to_string())
     .and_then(move |feed| {
-      let mut channel = FeedChannel {
-        id: 0,
+      let channel = models::NewFeed {
         title: feed.title().to_string(),
         site_link: feed.link().to_string(),
         feed_link: url.to_string(),
         description: feed.description().to_string(),
         updated_at: Utc::now().naive_local(),
       };
-      insert_channel(&mut channel);
-      Ok((feed, channel.id))
+      let new_ch = insert_channel(channel);
+      Ok((feed, new_ch.id))
     })
     .and_then(move |(feed, channel_id)| {
       let items: Vec<NewItem> = process_items(feed.items(), &channel_id);
@@ -137,35 +136,41 @@ pub fn fetch_feed(url: String) -> impl Future<Item = Channel, Error = ()> {
     })
 }
 
-fn process_items<'a>(feed_items: &'a [Item], channel_id: &'a i32) -> Vec<NewItem<'a>> {
+fn process_items<'a>(feed_items: &'a [Item], channel_id: &'a i32) -> Vec<NewItem> {
   let items: Vec<NewItem> = feed_items
     .iter()
     .map(|item| NewItem {
-      guid: item.guid().unwrap().value(),
-      title: item.title().expect("no title!"),
-      link: item.link().expect("no link!"),
-      description: item.description().expect("no description!"),
+      guid: item.guid().unwrap().value().to_owned(),
+      title: item.title().expect("no title!").to_owned(),
+      link: item.link().expect("no link!").to_owned(),
+      summary: item.description().and_then(|s| Some(s.to_owned())),
+      content: item.content().and_then(|s| Some(s.to_owned())),
       published_at: DateTime::<FixedOffset>::parse_from_rfc2822(item.pub_date().unwrap())
         .unwrap()
         .naive_local(),
-      feed_channel_id: channel_id,
-      content: item.content(),
+      updated_at: Some(
+        DateTime::<FixedOffset>::parse_from_rfc2822(item.pub_date().unwrap())
+          .unwrap()
+          .naive_local(),
+      ),
+      feed_id: *channel_id,
     })
     .collect();
   items
 }
 
 fn process_duplicates(items: Vec<NewItem>) -> Vec<NewItem> {
-  match find_duplicates(items.iter().map(|x| x.guid).collect()) {
+  match find_duplicates(items.iter().map(|x| x.guid.as_str()).collect()) {
     Some(dupes) => {
       let guids: Vec<&str> = dupes.iter().map(|x| x.1.as_str()).collect();
-      let (new_items, mut duplicated_items): (Vec<NewItem>, Vec<NewItem>) =
-        items.into_iter().partition(|x| !guids.contains(&x.guid));
+      let (new_items, mut duplicated_items): (Vec<NewItem>, Vec<NewItem>) = items
+        .into_iter()
+        .partition(|x| !guids.contains(&x.guid.as_str()));
 
       duplicated_items.into_iter().for_each(|d| {
         let idx = dupes.iter().find(|(_, y, _)| y == &d.guid).unwrap();
         if d.published_at != idx.2 {
-          update_item(idx.0, &d)
+          update_item(idx.0, d)
         }
       });
       new_items

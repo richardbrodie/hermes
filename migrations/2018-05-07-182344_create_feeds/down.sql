@@ -1,2 +1,2 @@
 -- This file should undo anything in `up.sql`
-DROP TABLE feed_channels
+DROP TABLE feeds

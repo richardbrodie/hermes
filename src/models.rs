@@ -6,73 +6,134 @@ use std::str;
 use db::get_user;
 use schema::*;
 
+//////////
+// Feed //
+//////////
+
 #[derive(Debug, Queryable, Associations, Identifiable, Serialize)]
-#[belongs_to(FeedChannel)]
-pub struct FeedItem {
+pub struct Feed {
+  pub id: i32,
+  pub title: String,
+  pub description: String,
+  pub site_link: String,
+  pub feed_link: String,
+  pub updated_at: NaiveDateTime,
+}
+
+#[derive(Insertable)]
+#[table_name = "feeds"]
+pub struct NewFeed {
+  pub title: String,
+  pub description: String,
+  pub site_link: String,
+  pub feed_link: String,
+  pub updated_at: NaiveDateTime,
+}
+
+//////////
+// Item //
+//////////
+
+#[derive(Debug, Queryable, Associations, Identifiable, Serialize)]
+#[belongs_to(Feed)]
+pub struct Item {
   pub id: i32,
   #[serde(skip_serializing)]
   pub guid: String,
-  pub title: String,
   pub link: String,
-  pub description: String,
-  pub published_at: NaiveDateTime,
-  #[serde(skip_serializing)]
-  pub feed_channel_id: i32,
+  pub title: String,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub summary: Option<String>,
   #[serde(skip_serializing_if = "Option::is_none")]
   pub content: Option<String>,
+  pub published_at: NaiveDateTime,
+  pub updated_at: Option<NaiveDateTime>,
+  #[serde(skip_serializing)]
+  pub feed_id: i32,
 }
 
+#[derive(Insertable, AsChangeset, Debug)]
+#[table_name = "items"]
+pub struct NewItem {
+  pub guid: String,
+  pub link: String,
+  pub title: String,
+  pub summary: Option<String>,
+  pub content: Option<String>,
+  pub published_at: NaiveDateTime,
+  pub updated_at: Option<NaiveDateTime>,
+  pub feed_id: i32,
+}
+// impl<'a> NewItem<'a> {
+//   pub fn from_item(item: &Item) -> NewItem {
+//     NewItem {
+//       guid: item.guid,
+//       title: item.title,
+//       link: item.link,
+//       summary: item.summary.and_then(|v| Some(v.as_str())),
+//       content: item.content.and_then(|v| Some(v.as_str())),
+//       published_at: item.published_at,
+//       updated_at: item.updated_at.or(None),
+//       feed_id: &item.feed_id,
+//     }
+//   }
+// }
+
+//////////////////
+// Subscription //
+//////////////////
+
 #[derive(Debug, Queryable, Associations, Identifiable, Serialize, AsChangeset)]
-#[belongs_to(FeedItem)]
-pub struct SubscribedFeedItem {
+#[belongs_to(Item)]
+pub struct SubscribedItem {
   pub id: i32,
-  pub feed_item_id: i32,
+  pub item_id: i32,
   pub user_id: i32,
   pub seen: bool,
 }
 
+#[derive(Debug, Queryable, Associations, Identifiable, Serialize)]
+#[belongs_to(Feed)]
+pub struct SubscribedFeed {
+  pub id: i32,
+  pub user_id: i32,
+  pub feed_id: i32,
+}
+
+///////////////
+// Composite //
+///////////////
+
 #[derive(Debug, Queryable, Serialize)]
-pub struct CompositeFeedItem {
+pub struct CompositeItem {
   pub item_id: i32,
   pub title: String,
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub link: Option<String>,
-  pub description: String,
-  pub published_at: NaiveDateTime,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub summary: Option<String>,
   #[serde(skip_serializing_if = "Option::is_none")]
   pub content: Option<String>,
+  pub published_at: NaiveDateTime,
   pub seen: bool,
 }
-impl CompositeFeedItem {
-  pub fn partial(item: &(i32, String, String, NaiveDateTime, bool)) -> Self {
-    CompositeFeedItem {
+impl CompositeItem {
+  pub fn partial(item: (i32, String, Option<String>, NaiveDateTime, bool)) -> Self {
+    CompositeItem {
       item_id: item.0,
       title: item.1.to_string(),
       link: None,
-      description: item.2.to_string(),
-      published_at: item.3,
+      summary: item.2,
       content: None,
+      published_at: item.3,
       seen: item.4,
     }
   }
 }
 
-#[derive(Debug, Queryable, Associations, Identifiable, Serialize)]
-pub struct FeedChannel {
-  pub id: i32,
-  pub title: String,
-  pub site_link: String,
-  pub feed_link: String,
-  pub description: String,
-  pub updated_at: NaiveDateTime,
-}
-
-#[derive(Debug, Queryable, Associations, Identifiable, Serialize)]
-#[belongs_to(FeedChannel)]
-pub struct Subscription {
-  pub id: i32,
-  pub user_id: i32,
-  pub feed_channel_id: i32,
-}
+//////////
+// User //
+//////////
 
 #[derive(Debug, Queryable, Associations, Identifiable, Serialize)]
 pub struct User {
@@ -109,6 +170,10 @@ impl User {
     orig_hash == hashed_pw
   }
 }
+
+////////////
+// Claims //
+////////////
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Claims {

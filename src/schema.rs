@@ -1,41 +1,42 @@
 table! {
-    feed_channels (id) {
+    feeds (id) {
         id -> Int4,
         title -> Varchar,
+        description -> Text,
         site_link -> Varchar,
         feed_link -> Varchar,
-        description -> Text,
         updated_at -> Timestamp,
     }
 }
 
 table! {
-    feed_items (id) {
+    items (id) {
         id -> Int4,
         guid -> Varchar,
-        title -> Varchar,
         link -> Varchar,
-        description -> Text,
-        published_at -> Timestamp,
-        feed_channel_id -> Int4,
+        title -> Varchar,
+        summary -> Nullable<Text>,
         content -> Nullable<Text>,
+        published_at -> Timestamp,
+        updated_at -> Nullable<Timestamp>,
+        feed_id -> Int4,
     }
 }
 
 table! {
-    subscribed_feed_items (id) {
+    subscribed_feeds (id) {
         id -> Int4,
         user_id -> Int4,
-        feed_item_id -> Int4,
+        feed_id -> Int4,
+    }
+}
+
+table! {
+    subscribed_items (id) {
+        id -> Int4,
+        user_id -> Int4,
+        item_id -> Int4,
         seen -> Bool,
-    }
-}
-
-table! {
-    subscriptions (id) {
-        id -> Int4,
-        user_id -> Int4,
-        feed_channel_id -> Int4,
     }
 }
 
@@ -47,16 +48,16 @@ table! {
     }
 }
 
-joinable!(feed_items -> feed_channels (feed_channel_id));
-joinable!(subscribed_feed_items -> feed_items (feed_item_id));
-joinable!(subscribed_feed_items -> users (user_id));
-joinable!(subscriptions -> feed_channels (feed_channel_id));
-joinable!(subscriptions -> users (user_id));
+joinable!(items -> feeds (feed_id));
+joinable!(subscribed_feeds -> feeds (feed_id));
+joinable!(subscribed_feeds -> users (user_id));
+joinable!(subscribed_items -> items (item_id));
+joinable!(subscribed_items -> users (user_id));
 
 allow_tables_to_appear_in_same_query!(
-    feed_channels,
-    feed_items,
-    subscribed_feed_items,
-    subscriptions,
+    feeds,
+    items,
+    subscribed_feeds,
+    subscribed_items,
     users,
 );

@@ -13,7 +13,7 @@ use futures::prelude::*;
 
 use feeds_lib::db::{self, insert_channel};
 use feeds_lib::feed::fetch_feed;
-use feeds_lib::models::FeedChannel;
+use feeds_lib::models::NewFeed;
 
 fn main() {
   db::create_admin_user();
@@ -32,16 +32,15 @@ fn main() {
 fn add_feed(url: String, uid: i32) -> impl Future<Item = (), Error = ()> {
   fetch_feed(url.to_string())
     .and_then(move |feed| {
-      let mut channel = FeedChannel {
-        id: 0,
+      let channel = NewFeed {
         title: feed.title().to_string(),
         site_link: feed.link().to_string(),
         feed_link: url.to_string(),
         description: feed.description().to_string(),
         updated_at: Utc::now().naive_local(),
       };
-      insert_channel(&mut channel);
-      Ok(channel.id)
+      let new_ch = insert_channel(channel);
+      Ok(new_ch.id)
     })
     .and_then(move |ch_id| {
       db::subscribe_channel(&uid, &ch_id);

@@ -1,10 +1,12 @@
 -- Your SQL goes here
-CREATE TABLE feed_items (
+CREATE TABLE items (
     id                 SERIAL PRIMARY KEY,
     guid               VARCHAR UNIQUE NOT NULL,
-    title              VARCHAR NOT NULL,
     link               VARCHAR NOT NULL,
-    description        TEXT NOT NULL,
+    title              VARCHAR NOT NULL,
+    summary            TEXT,
+    content            TEXT,
     published_at       TIMESTAMP NOT NULL,
-    feed_channel_id    INTEGER REFERENCES feed_channels NOT NULL
+    updated_at         TIMESTAMP,
+    feed_id            INTEGER REFERENCES feeds NOT NULL
 )

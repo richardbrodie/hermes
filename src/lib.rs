@@ -1,4 +1,5 @@
 #![allow(unused)]
+extern crate atom_syndication;
 extern crate base64;
 #[macro_use]
 extern crate diesel;
@@ -13,6 +14,7 @@ extern crate jsonwebtoken;
 #[macro_use]
 extern crate lazy_static;
 extern crate pretty_env_logger;
+extern crate quick_xml;
 extern crate r2d2;
 extern crate r2d2_diesel;
 extern crate regex;
