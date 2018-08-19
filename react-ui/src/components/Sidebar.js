@@ -34,8 +34,7 @@ class Sidebar extends Component {
   }
 
   fetchData() {
-    // const url = "http://localhost:4000/feeds";
-    const url = "/feeds";
+    const url = "/api/feeds";
     var headers = new Headers({
       "Content-Type": "application/json",
       Authorization: "Bearer " + store.currentJWT
@@ -46,7 +45,9 @@ class Sidebar extends Component {
     });
     fetch(req)
       .then(resp => resp.json())
-      .then(data => this.setState({ feeds: data }))
+      .then(data => {
+        if (data) { this.setState({ feeds: data }) }
+      })
       .catch(error => store.msgCallback('error', error, 'warning'));
   }
 }

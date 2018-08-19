@@ -1,14 +1,15 @@
-use chrono::{DateTime, FixedOffset, NaiveDateTime, Utc};
+use chrono::{DateTime, Utc};
 use diesel::dsl::exists;
 use diesel::prelude::*;
 use diesel::{self, select, PgConnection};
-use dotenv::dotenv;
-use r2d2::{Pool, PooledConnection};
+use r2d2::Pool;
 use r2d2_diesel::ConnectionManager;
-use schema::{feeds, items, subscribed_feeds, subscribed_items, users};
+use std::collections::HashMap;
 use std::{env, thread};
 
 use models::{CompositeItem, Feed, Item, NewFeed, NewItem, SubscribedFeed, SubscribedItem, User};
+use schema::{feeds, items, subscribed_feeds, subscribed_items, users};
+use views::{subscribed_feeds_with_count_view, subscribed_items_view};
 
 lazy_static! {
   static ref POOL: Pool<ConnectionManager<PgConnection>> = {
@@ -87,31 +88,43 @@ pub fn insert_channel(channel: NewFeed) -> Feed {
 
 // used during update loop
 pub fn get_channel_urls_and_subscribers() -> Vec<(i32, String, Vec<i32>)> {
-  use schema::feeds;
-  use schema::subscribed_feeds;
-
   let pool = establish_pool();
   let connection = pool.get().unwrap();
-  let channels = feeds::table.load::<Feed>(&*connection).unwrap();
-  let subscribed_feeds = SubscribedFeed::belonging_to(&channels)
-    .load::<SubscribedFeed>(&*connection)
-    .unwrap()
-    .grouped_by(&channels);
-  let data = channels
+
+  let subscribed = subscribed_feeds::table
+    .select((subscribed_feeds::feed_id, subscribed_feeds::user_id))
+    .load::<(i32, i32)>(&*connection)
+    .unwrap();
+
+  let mut h: HashMap<i32, Vec<i32>> = HashMap::new();
+  subscribed.iter().for_each(|x| {
+    h.entry(x.0)
+      .and_modify(|e| e.push(x.1))
+      .or_insert(vec![x.1]);
+  });
+
+  // let feeds: Result<Vec<(i32, String, Vec<i32>)>, diesel::result::Error> = feeds::table
+  //   .select((feeds::id, feeds::feed_link))
+  //   .load::<(i32, String)>(&*connection)
+  //   .map(|f| {
+  //     f.into_iter()
+  //       .map(|(i, u)| (i, u, h.remove(&i).unwrap()))
+  //       .collect()
+  //   });
+  // info!("result: {:?}", feeds);
+
+  let feeds = feeds::table
+    .select((feeds::id, feeds::feed_link))
+    .load::<(i32, String)>(&*connection)
+    .unwrap();
+
+  let res: Vec<(i32, String, Vec<i32>)> = feeds
     .into_iter()
-    .zip(subscribed_feeds)
-    .collect::<Vec<_>>();
-  let result = data
-    .into_iter()
-    .map(|(f, s)| {
-      (
-        f.id,
-        f.feed_link,
-        s.into_iter().map(|i| i.user_id).collect(),
-      )
-    })
+    .map(|(i, u)| (i, u, h.remove(&i).unwrap()))
     .collect();
-  result
+
+  // vec![(1, "2".to_string(), Vec::new())]
+  res
 }
 
 //items
@@ -119,6 +132,7 @@ pub fn get_channel_urls_and_subscribers() -> Vec<(i32, String, Vec<i32>)> {
 pub fn insert_items(items: &Vec<NewItem>) -> Option<Vec<i32>> {
   use schema::items;
 
+  debug!("found {} new items", items.len());
   let pool = establish_pool();
   let connection = pool.get().unwrap();
   match diesel::insert_into(items::table)
@@ -259,7 +273,7 @@ pub fn get_subscribed_items(
       .order(items::published_at.desc())
       .into_boxed();
     if let Some(d) = updated {
-      query = query.filter(items::published_at.lt(updated.unwrap()))
+      query = query.filter(items::published_at.lt(d))
     }
     match query
       .limit(50)
@@ -283,7 +297,7 @@ pub fn get_subscribed_items(
       Ok(items) => Some(
         items
           .into_iter()
-          .map(|mut i| CompositeItem::partial(i))
+          .map(|i| CompositeItem::partial(i))
           .collect(),
       ),
       Err(_) => None,
@@ -292,33 +306,23 @@ pub fn get_subscribed_items(
   handle.join().unwrap()
 }
 
-pub fn get_subscribed_item(iid: i32, uid: i32) -> Option<CompositeItem> {
-  use schema::items;
+pub fn get_subscribed_item(iid: i32, uid: i32) -> Option<SubscribedItem> {
   use schema::subscribed_items;
 
   let pool = establish_pool();
   let handle = thread::spawn(move || {
     let connection = pool.get().unwrap();
 
-    let item = items::table.find(iid).first::<Item>(&*connection).unwrap();
-    let subscribed = SubscribedItem::belonging_to(&item)
-      .filter(subscribed_items::user_id.eq(uid))
-      .first::<SubscribedItem>(&*connection);
-    match subscribed {
-      Ok(s) => {
-        diesel::update(&s)
+    match subscribed_items_view::table
+      .filter(subscribed_items_view::id.eq(iid))
+      .filter(subscribed_items_view::user_id.eq(uid))
+      .first::<SubscribedItem>(&*connection)
+    {
+      Ok(item) => {
+        diesel::update(subscribed_items::table.find(item.subscribed_item_id))
           .set(subscribed_items::seen.eq(true))
           .execute(&*connection);
-        Some(CompositeItem {
-          item_id: item.id,
-          title: item.title,
-          link: Some(item.link),
-          summary: item.summary,
-          published_at: item.published_at,
-          updated_at: item.updated_at,
-          content: item.content,
-          seen: true,
-        })
+        Some(item)
       }
       Err(_) => None,
     }

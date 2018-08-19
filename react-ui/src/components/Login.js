@@ -17,7 +17,6 @@ class Login extends Component {
   }
 
   login(username, password) {
-    // var url = "http://localhost:4000/authenticate";
     var url = "/authenticate";
     var body = JSON.stringify({
       username: username,

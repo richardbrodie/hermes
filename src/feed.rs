@@ -1,6 +1,5 @@
 use atom_syndication;
-use chrono::{DateTime, FixedOffset, Utc};
-use futures::future::{self, IntoFuture};
+use futures::future::IntoFuture;
 use hyper::rt::{self, Future, Stream};
 use hyper::{Body, Client};
 use hyper_tls::HttpsConnector;
@@ -12,13 +11,12 @@ use std::option::Option;
 use std::str;
 use std::time::{Duration, Instant};
 use tokio::timer::Interval;
-use url::Url;
 
 use db::{
   self, find_duplicates, get_channel_urls_and_subscribers, insert_channel, insert_items,
   insert_subscribed_items, subscribe_channel, update_item,
 };
-use models::{self, NewFeed, NewItem};
+use models::{NewFeed, NewItem};
 
 enum FeedType {
   RSS(rss::Channel),
@@ -138,14 +136,14 @@ fn parse_fetched_data(string: &[u8]) -> Result<FeedType, ()> {
           debug!("found rss");
           match rss::Channel::read_from(BufReader::new(string)) {
             Ok(channel) => return Ok(FeedType::RSS(channel)),
-            Err(e) => return Err(()),
+            Err(_) => return Err(()),
           }
         }
         b"feed" => {
           debug!("found atom");
           match atom_syndication::Feed::read_from(BufReader::new(string)) {
             Ok(feed) => return Ok(FeedType::Atom(feed)),
-            Err(e) => return Err(()),
+            Err(_) => return Err(()),
           }
         }
         _ => (),
@@ -153,7 +151,6 @@ fn parse_fetched_data(string: &[u8]) -> Result<FeedType, ()> {
       _ => (),
     }
   }
-  Err(())
 }
 
 fn handle_feed_types(parsed: FeedType, url: &str) -> Result<(NewFeed, ItemType), ()> {
@@ -217,12 +214,21 @@ fn process_duplicates(items: Vec<NewItem>) -> Option<Vec<NewItem>> {
         .into_iter()
         .partition(|x| !guids.contains(&x.guid.as_str()));
 
-      duplicated_items.into_iter().for_each(|d| {
-        let idx = dupes.iter().find(|(_, y, _)| y == &d.guid).unwrap();
-        if d.published_at != idx.2 {
-          update_item(idx.0, d)
-        }
-      });
+      let updated_items: Vec<(i32, NewItem)> = duplicated_items
+        .into_iter()
+        .filter_map(|d| {
+          let idx = dupes.iter().find(|(_, y, _)| y == &d.guid).unwrap();
+          if d.published_at != idx.2 {
+            Some((idx.0, d))
+          } else {
+            None
+          }
+        })
+        .collect();
+      info!("found {} updated items", updated_items.len());
+      updated_items
+        .into_iter()
+        .for_each(|(id, item)| update_item(id, item));
       new_items
     }
     None => items,

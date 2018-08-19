@@ -24,8 +24,7 @@ class SingleItem extends Component {
   }
 
   fetchData() {
-    // var url = `http://localhost:4000/item/${this.state.item.item_id}`;
-    var url = `/item/${this.state.item.item_id}`;
+    var url = `/api/item/${this.state.item.item_id}`;
     var headers = new Headers({
       "Content-Type": "application/json",
       Authorization: "Bearer " + store.currentJWT

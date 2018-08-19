@@ -7,6 +7,7 @@ use std::str;
 
 use db::get_user;
 use schema::*;
+use views::*;
 
 //////////
 // Feed //
@@ -120,21 +121,35 @@ impl NewItem {
 // Subscription //
 //////////////////
 
-#[derive(Debug, Queryable, Associations, Identifiable, Serialize, AsChangeset)]
-#[belongs_to(Item)]
+#[derive(Debug, Queryable, Serialize)]
 pub struct SubscribedItem {
   pub id: i32,
-  pub item_id: i32,
+  #[serde(skip_serializing)]
+  pub guid: String,
+  pub link: String,
+  pub title: String,
+  pub summary: Option<String>,
+  pub content: Option<String>,
+  pub published_at: Option<DateTime<Utc>>,
+  pub updated_at: Option<DateTime<Utc>>,
+  pub feed_id: i32,
+  pub subscribed_item_id: i32,
   pub user_id: i32,
   pub seen: bool,
 }
 
-#[derive(Debug, Queryable, Associations, Identifiable, Serialize)]
-#[belongs_to(Feed)]
+#[derive(Debug, Queryable, Serialize, Associations)]
+#[belongs_to(User)]
 pub struct SubscribedFeed {
   pub id: i32,
+  pub title: String,
+  pub description: Option<String>,
+  pub site_link: String,
+  pub feed_link: String,
+  pub updated_at: DateTime<Utc>,
+  pub subscribed_feed_id: i32,
   pub user_id: i32,
-  pub feed_id: i32,
+  pub seen_count: i32,
 }
 
 ///////////////
