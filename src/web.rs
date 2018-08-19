@@ -1,4 +1,4 @@
-use chrono::{DateTime, FixedOffset, NaiveDateTime};
+use chrono::{DateTime, FixedOffset, NaiveDateTime, Utc};
 use futures::{future, Future, Stream};
 use hyper::header::{
   ACCESS_CONTROL_ALLOW_CREDENTIALS, ACCESS_CONTROL_ALLOW_HEADERS, ACCESS_CONTROL_ALLOW_METHODS,
@@ -209,7 +209,7 @@ fn show_items(req: Request<Body>, claims: &Claims) -> ResponseFuture {
         .into_owned()
         .collect::<HashMap<String, String>>();
       match params.get("updated") {
-        Some(d) => match NaiveDateTime::parse_from_str(d, "%Y-%m-%dT%H:%M:%S") {
+        Some(d) => match d.parse::<DateTime<Utc>>() {
           Ok(t) => Some(t),
           Err(err) => return Router::response(body, StatusCode::BAD_REQUEST),
         },

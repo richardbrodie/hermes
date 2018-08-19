@@ -31,8 +31,12 @@ class Items extends Component {
         <Link className="title" to={{ pathname: '/item', state: { item: item } }}>
           <div key={i} className={`feed-item seen_${item.seen}`} >
             <span>{item.title}</span>
-            <span className='desc meta'>{item.description}</span>
-            <TimeAgo className='pub_date meta' date={item.published_at} minPeriod='30' />
+            <span className='desc meta'>{item.summary}</span>
+            if(item.updated_at > item.published_at) {
+              <TimeAgo className='pub_date pub_updated meta' date={item.updated_at} minPeriod='30' />
+            } else {
+              <TimeAgo className='pub_date meta' date={item.published_at} minPeriod='30' />
+            }
           </div >
         </Link>
       )
@@ -48,7 +52,6 @@ class Items extends Component {
   }
 
   fetchData() {
-    // var url = `http://localhost:4000/items/${this.state.id}`;
     var url = `/items/${this.state.id}`;
     if (this.state.lastDate) {
       url = `${url}?updated=${this.state.lastDate}`

@@ -6,7 +6,7 @@ CREATE TABLE items (
     title              VARCHAR NOT NULL,
     summary            TEXT,
     content            TEXT,
-    published_at       TIMESTAMP,
-    updated_at         TIMESTAMP,
+    published_at       TIMESTAMPTZ,
+    updated_at         TIMESTAMPTZ,
     feed_id            INTEGER REFERENCES feeds NOT NULL
 )

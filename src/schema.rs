@@ -5,7 +5,7 @@ table! {
         description -> Nullable<Text>,
         site_link -> Varchar,
         feed_link -> Varchar,
-        updated_at -> Timestamp,
+        updated_at -> Timestamptz,
     }
 }
 
@@ -17,8 +17,8 @@ table! {
         title -> Varchar,
         summary -> Nullable<Text>,
         content -> Nullable<Text>,
-        published_at -> Nullable<Timestamp>,
-        updated_at -> Nullable<Timestamp>,
+        published_at -> Nullable<Timestamptz>,
+        updated_at -> Nullable<Timestamptz>,
         feed_id -> Int4,
     }
 }

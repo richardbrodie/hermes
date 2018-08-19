@@ -26,6 +26,9 @@
   min-width: 85px;
   margin-left: auto;
 }
+.pub_updated:before {
+  content:"*";
+}
 .desc {
   flex: 1;
   color: #8b8b8b;

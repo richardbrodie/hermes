@@ -19,7 +19,7 @@ pub struct Feed {
   pub description: Option<String>,
   pub site_link: String,
   pub feed_link: String,
-  pub updated_at: NaiveDateTime,
+  pub updated_at: DateTime<Utc>,
 }
 
 #[derive(Insertable)]
@@ -29,7 +29,7 @@ pub struct NewFeed {
   pub description: Option<String>,
   pub site_link: String,
   pub feed_link: String,
-  pub updated_at: NaiveDateTime,
+  pub updated_at: DateTime<Utc>,
 }
 impl NewFeed {
   pub fn from_rss(feed: &rss::Channel, url: &str) -> NewFeed {
@@ -38,7 +38,7 @@ impl NewFeed {
       site_link: feed.link().to_string(),
       feed_link: url.to_string(),
       description: Some(feed.description().to_string()),
-      updated_at: Utc::now().naive_local(),
+      updated_at: Utc::now(),
     }
   }
 
@@ -48,7 +48,7 @@ impl NewFeed {
       site_link: feed.links()[0].href().to_string(),
       feed_link: url.to_string(),
       description: feed.subtitle().and_then(|s| Some(s.to_owned())),
-      updated_at: Utc::now().naive_local(),
+      updated_at: Utc::now(),
     }
   }
 }
@@ -69,8 +69,8 @@ pub struct Item {
   pub summary: Option<String>,
   #[serde(skip_serializing_if = "Option::is_none")]
   pub content: Option<String>,
-  pub published_at: Option<NaiveDateTime>,
-  pub updated_at: Option<NaiveDateTime>,
+  pub published_at: Option<DateTime<Utc>>,
+  pub updated_at: Option<DateTime<Utc>>,
   #[serde(skip_serializing)]
   pub feed_id: i32,
 }
@@ -83,8 +83,8 @@ pub struct NewItem {
   pub title: String,
   pub summary: Option<String>,
   pub content: Option<String>,
-  pub published_at: Option<NaiveDateTime>,
-  pub updated_at: Option<NaiveDateTime>,
+  pub published_at: Option<DateTime<Utc>>,
+  pub updated_at: Option<DateTime<Utc>>,
   pub feed_id: i32,
 }
 impl NewItem {
@@ -95,8 +95,8 @@ impl NewItem {
       link: item.link().expect("no link!").to_owned(),
       summary: item.description().and_then(|s| Some(s.to_owned())),
       content: item.content().and_then(|s| Some(s.to_owned())),
-      published_at: parse_date(item.pub_date()),
-      updated_at: parse_date(item.pub_date()),
+      published_at: item.pub_date().and_then(|d| parse_date(d)),
+      updated_at: item.pub_date().and_then(|d| parse_date(d)),
       feed_id: feed_id,
     }
   }
@@ -109,8 +109,8 @@ impl NewItem {
       content: item
         .content()
         .and_then(|o| o.value().and_then(|s| Some(s.to_owned()))),
-      published_at: parse_date(item.published()),
-      updated_at: parse_date_int(item.updated()),
+      published_at: item.published().and_then(|d| parse_date(d)),
+      updated_at: parse_date(item.updated()),
       feed_id: feed_id,
     }
   }
@@ -151,8 +151,8 @@ pub struct CompositeItem {
   pub summary: Option<String>,
   #[serde(skip_serializing_if = "Option::is_none")]
   pub content: Option<String>,
-  pub published_at: Option<NaiveDateTime>,
-  pub updated_at: Option<NaiveDateTime>,
+  pub published_at: Option<DateTime<Utc>>,
+  pub updated_at: Option<DateTime<Utc>>,
   pub seen: bool,
 }
 impl CompositeItem {
@@ -161,8 +161,8 @@ impl CompositeItem {
       i32,
       String,
       Option<String>,
-      Option<NaiveDateTime>,
-      Option<NaiveDateTime>,
+      Option<DateTime<Utc>>,
+      Option<DateTime<Utc>>,
       bool,
     ),
   ) -> Self {
@@ -229,18 +229,9 @@ pub struct Claims {
   pub id: i32,
 }
 
-fn parse_date_int(date: &str) -> Option<NaiveDateTime> {
+fn parse_date(date: &str) -> Option<DateTime<Utc>> {
   match DateTime::parse_from_rfc2822(date) {
-    Ok(d) => Some(d.naive_local()),
-    Err(_) => match DateTime::parse_from_rfc3339(date) {
-      Ok(d) => Some(d.naive_local()),
-      Err(_) => None,
-    },
-  }
-}
-fn parse_date(date: Option<&str>) -> Option<NaiveDateTime> {
-  match date {
-    None => return None,
-    Some(s) => parse_date_int(s),
+    Ok(d) => Some(d.with_timezone(&Utc)),
+    Err(_) => date.parse::<DateTime<Utc>>().ok(),
   }
 }

@@ -5,5 +5,5 @@ CREATE TABLE feeds (
     description   TEXT,
     site_link     VARCHAR NOT NULL,
     feed_link     VARCHAR NOT NULL,
-    updated_at    TIMESTAMP NOT NULL
+    updated_at    TIMESTAMPTZ NOT NULL
 )

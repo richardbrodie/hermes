@@ -1,4 +1,4 @@
-use chrono::{DateTime, FixedOffset, NaiveDateTime};
+use chrono::{DateTime, FixedOffset, NaiveDateTime, Utc};
 use diesel::dsl::exists;
 use diesel::prelude::*;
 use diesel::{self, select, PgConnection};
@@ -146,7 +146,7 @@ pub fn update_item(iid: i32, item: NewItem) {
     .execute(&*connection);
 }
 
-pub fn find_duplicates(guids: Vec<&str>) -> Option<Vec<(i32, String, Option<NaiveDateTime>)>> {
+pub fn find_duplicates(guids: Vec<&str>) -> Option<Vec<(i32, String, Option<DateTime<Utc>>)>> {
   use schema::items::dsl::*;
 
   let pool = establish_pool();
@@ -172,7 +172,7 @@ pub fn get_item_ids(fid: &i32) -> Option<Vec<i32>> {
   }
 }
 
-pub fn get_latest_item_date(feed_id: i32) -> Option<NaiveDateTime> {
+pub fn get_latest_item_date(feed_id: i32) -> Option<DateTime<Utc>> {
   use schema::items::dsl::*;
 
   let pool = establish_pool();
@@ -244,7 +244,7 @@ pub fn get_subscribed_channels(uid: &i32) -> Option<Vec<Feed>> {
 pub fn get_subscribed_items(
   fid: i32,
   uid: i32,
-  updated: Option<NaiveDateTime>,
+  updated: Option<DateTime<Utc>>,
 ) -> Option<Vec<CompositeItem>> {
   use schema::items;
   use schema::subscribed_items;
@@ -275,8 +275,8 @@ pub fn get_subscribed_items(
         i32,
         String,
         Option<String>,
-        Option<NaiveDateTime>,
-        Option<NaiveDateTime>,
+        Option<DateTime<Utc>>,
+        Option<DateTime<Utc>>,
         bool,
       )>(&*connection)
     {
