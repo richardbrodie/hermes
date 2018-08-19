@@ -1,9 +1,12 @@
+use atom_syndication;
 use chrono::{DateTime, FixedOffset, Utc};
 use futures::future::{self, IntoFuture};
 use hyper::rt::{self, Future, Stream};
 use hyper::{Body, Client};
 use hyper_tls::HttpsConnector;
-use rss::{Channel, Item};
+use quick_xml::events::Event;
+use quick_xml::Reader;
+use rss;
 use std::io::BufReader;
 use std::option::Option;
 use std::str;
@@ -15,7 +18,20 @@ use db::{
   self, find_duplicates, get_channel_urls_and_subscribers, insert_channel, insert_items,
   insert_subscribed_items, subscribe_channel, update_item,
 };
-use models::{self, NewItem};
+use models::{self, NewFeed, NewItem};
+
+enum FeedType {
+  RSS(rss::Channel),
+  Atom(atom_syndication::Feed),
+}
+enum ItemType {
+  Item(Vec<rss::Item>),
+  Entry(Vec<atom_syndication::Entry>),
+}
+
+////////////////////////
+/// Future sequences ///
+////////////////////////
 
 pub fn start_feed_loop() {
   let task = Interval::new(Instant::now(), Duration::from_secs(120))
@@ -32,69 +48,137 @@ pub fn start_feed_loop() {
 
 pub fn subscribe_feed(url: String, uid: i32) {
   debug!("subscribing: '{}' by '{}'", url, uid);
-  rt::spawn(future::lazy(move || {
-    db::get_channel_id(&url)
-      .into_future()
-      .and_then(|cid| {
-        debug!("in db: '{}'", cid);
-        Ok((cid, db::get_item_ids(&cid)))
+  let work = db::get_channel_id(&url)
+    .into_future()
+    .and_then(|cid| {
+      debug!("in db: '{}'", cid);
+      Ok((cid, db::get_item_ids(&cid)))
+    })
+    .or_else(|_| {
+      debug!("not in db: '{}'", url);
+      add_feed(url)
+    })
+    .and_then(move |(ch_id, item_ids)| {
+      subscribe_channel(&uid, &ch_id);
+      Ok(item_ids)
+    })
+    .and_then(move |ids| {
+      Ok(match ids {
+        Some(items) => finalise_subscribed_items(items, vec![uid]),
+        None => (),
       })
-      .or_else(|_| {
-        debug!("not in db: '{}'", url);
-        add_feed(url)
-      })
-      .and_then(move |(ch_id, item_ids)| {
-        subscribe_channel(&uid, &ch_id);
-        Ok(item_ids)
-      })
-      .and_then(move |ids| {
-        Ok(match ids {
-          Some(items) => prepare_subscribed_items(items, vec![uid]),
-          None => (),
-        })
-      })
-  }));
+    });
+  rt::spawn(work);
 }
 
-// internal
 pub fn add_feed(url: String) -> impl Future<Item = (i32, Option<Vec<i32>>), Error = ()> {
   fetch_feed(url.to_string())
-    .and_then(move |feed| {
-      let channel = models::NewFeed {
-        title: feed.title().to_string(),
-        site_link: feed.link().to_string(),
-        feed_link: url.to_string(),
-        description: feed.description().to_string(),
-        updated_at: Utc::now().naive_local(),
-      };
-      let new_ch = insert_channel(channel);
-      Ok((feed, new_ch.id))
+    .and_then(|data| parse_fetched_data(&data))
+    .and_then(move |data| handle_feed_types(data, &url))
+    .and_then(|(new_feed, new_items)| {
+      let new_ch = insert_channel(new_feed);
+      Ok((new_items, new_ch.id))
     })
-    .and_then(move |(feed, channel_id)| {
-      let items: Vec<NewItem> = process_items(feed.items(), &channel_id);
-      Ok((channel_id, insert_items(&items)))
-    })
+    .and_then(|(items, feed_id)| Ok((feed_id, handle_item_types(items, feed_id))))
+    .and_then(|(feed_id, items)| Ok((feed_id, insert_items(&items))))
 }
 
-pub fn update_feed(channel_id: i32, channel_url: String, subscribers: Vec<i32>) {
-  let work = fetch_feed(channel_url).and_then(move |feed| {
-    let items: Vec<NewItem> = process_items(feed.items(), &channel_id);
-    let new_items = process_duplicates(items);
-    if new_items.len() > 0 {
-      match insert_items(&new_items) {
-        Some(inserted_items) => prepare_subscribed_items(inserted_items, subscribers),
-        None => (),
-      }
-    }
-    Ok(())
-  });
+pub fn update_feed(feed_id: i32, channel_url: String, subscribers: Vec<i32>) {
+  let local = channel_url.to_owned();
+  let work = fetch_feed(channel_url)
+    .and_then(|data| parse_fetched_data(&data))
+    .and_then(move |data| handle_feed_types(data, &local))
+    .and_then(move |(_, items)| Ok(handle_item_types(items, feed_id)))
+    .and_then(|items| Ok(process_duplicates(items)))
+    .and_then(|new_items| {
+      new_items
+        .and_then(|items| insert_items(&items))
+        .map(|i| finalise_subscribed_items(i, subscribers));
+      Ok(())
+    });
 
   rt::spawn(work);
 }
 
-// internal
+/////////////////////////
+/// Future components ///
+/////////////////////////
 
-fn prepare_subscribed_items(inserted_items: Vec<i32>, subscribers: Vec<i32>) {
+pub fn fetch_feed(url: String) -> impl Future<Item = Vec<u8>, Error = ()> {
+  let https = HttpsConnector::new(2).expect("TLS initialization failed");
+  let client = Client::builder().build::<_, Body>(https);
+  let local = url.to_owned();
+  client
+    .get(url.parse().unwrap())
+    .map_err(move |err| error!("could not fetch: '{}': {}", url, err))
+    .and_then(move |res| {
+      debug!("fetching: '{}'", local);
+      res
+        .into_body()
+        .concat2()
+        .map_err(|_err| ())
+        .and_then(move |body| {
+          debug!("collected body: {}", local);
+          Ok(body.to_vec())
+        })
+    })
+}
+
+///////////////////
+/// Synchronous ///
+///////////////////
+
+fn parse_fetched_data(string: &[u8]) -> Result<FeedType, ()> {
+  let mut buf = Vec::new();
+  let mut reader = Reader::from_str(str::from_utf8(string).unwrap());
+  loop {
+    match reader.read_event(&mut buf) {
+      Ok(Event::Start(ref e)) => match e.name() {
+        b"rss" => {
+          debug!("found rss");
+          match rss::Channel::read_from(BufReader::new(string)) {
+            Ok(channel) => return Ok(FeedType::RSS(channel)),
+            Err(e) => return Err(()),
+          }
+        }
+        b"feed" => {
+          debug!("found atom");
+          match atom_syndication::Feed::read_from(BufReader::new(string)) {
+            Ok(feed) => return Ok(FeedType::Atom(feed)),
+            Err(e) => return Err(()),
+          }
+        }
+        _ => (),
+      },
+      _ => (),
+    }
+  }
+  Err(())
+}
+
+fn handle_feed_types(parsed: FeedType, url: &str) -> Result<(NewFeed, ItemType), ()> {
+  match parsed {
+    FeedType::RSS(feed) => {
+      let new_feed = NewFeed::from_rss(&feed, &url);
+      let new_items = ItemType::Item(feed.items().to_vec());
+      Ok((new_feed, new_items))
+    }
+    FeedType::Atom(feed) => {
+      let new_feed = NewFeed::from_atom(&feed, &url);
+      let new_items = ItemType::Entry(feed.entries().to_vec());
+      Ok((new_feed, new_items))
+    }
+  }
+}
+
+fn handle_item_types(parsed: ItemType, feed_id: i32) -> Vec<NewItem> {
+  match parsed {
+    ItemType::Item(i) => process_items(i, &feed_id),
+    ItemType::Entry(i) => process_entries(i, &feed_id),
+  }
+}
+
+fn finalise_subscribed_items(inserted_items: Vec<i32>, subscribers: Vec<i32>) {
   let insertables: Vec<(&i32, &i32, bool)> = subscribers
     .iter()
     .flat_map(|s| {
@@ -107,60 +191,26 @@ fn prepare_subscribed_items(inserted_items: Vec<i32>, subscribers: Vec<i32>) {
   insert_subscribed_items(insertables);
 }
 
-pub fn fetch_feed(url: String) -> impl Future<Item = Channel, Error = ()> {
-  debug!("fetching: '{}'", url);
-  let https = HttpsConnector::new(2).expect("TLS initialization failed");
-  let client = Client::builder().build::<_, Body>(https);
-  let local = url.to_owned();
-  client
-    .get(url.parse().unwrap())
-    .map_err(move |err| error!("could not fetch: '{}': {}", url, err))
-    .and_then(move |res| {
-      debug!("fetched: '{}'", local);
-      res
-        .into_body()
-        .concat2()
-        .map_err(|_err| ())
-        .and_then(
-          move |body| match Channel::read_from(BufReader::new(&body as &[u8])) {
-            Ok(channel) => {
-              debug!("parsed: '{}'", local);
-              Ok(channel)
-            }
-            Err(e) => {
-              error!("failed to parse: {}", e);
-              Err(())
-            }
-          },
-        )
-    })
-}
-
-fn process_items<'a>(feed_items: &'a [Item], channel_id: &'a i32) -> Vec<NewItem> {
+fn process_items<'a>(feed_items: Vec<rss::Item>, channel_id: &'a i32) -> Vec<NewItem> {
   let items: Vec<NewItem> = feed_items
     .iter()
-    .map(|item| NewItem {
-      guid: item.guid().unwrap().value().to_owned(),
-      title: item.title().expect("no title!").to_owned(),
-      link: item.link().expect("no link!").to_owned(),
-      summary: item.description().and_then(|s| Some(s.to_owned())),
-      content: item.content().and_then(|s| Some(s.to_owned())),
-      published_at: DateTime::<FixedOffset>::parse_from_rfc2822(item.pub_date().unwrap())
-        .unwrap()
-        .naive_local(),
-      updated_at: Some(
-        DateTime::<FixedOffset>::parse_from_rfc2822(item.pub_date().unwrap())
-          .unwrap()
-          .naive_local(),
-      ),
-      feed_id: *channel_id,
-    })
+    .map(|item| NewItem::from_item(item, *channel_id))
+    .collect();
+  items
+}
+fn process_entries<'a>(
+  feed_items: Vec<atom_syndication::Entry>,
+  channel_id: &'a i32,
+) -> Vec<NewItem> {
+  let items: Vec<NewItem> = feed_items
+    .iter()
+    .map(|entry| NewItem::from_entry(entry, *channel_id))
     .collect();
   items
 }
 
-fn process_duplicates(items: Vec<NewItem>) -> Vec<NewItem> {
-  match find_duplicates(items.iter().map(|x| x.guid.as_str()).collect()) {
+fn process_duplicates(items: Vec<NewItem>) -> Option<Vec<NewItem>> {
+  let new_items = match find_duplicates(items.iter().map(|x| x.guid.as_str()).collect()) {
     Some(dupes) => {
       let guids: Vec<&str> = dupes.iter().map(|x| x.1.as_str()).collect();
       let (new_items, mut duplicated_items): (Vec<NewItem>, Vec<NewItem>) = items
@@ -176,5 +226,9 @@ fn process_duplicates(items: Vec<NewItem>) -> Vec<NewItem> {
       new_items
     }
     None => items,
+  };
+  match new_items.is_empty() {
+    false => Some(new_items),
+    true => None,
   }
 }

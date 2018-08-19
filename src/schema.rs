@@ -2,7 +2,7 @@ table! {
     feeds (id) {
         id -> Int4,
         title -> Varchar,
-        description -> Text,
+        description -> Nullable<Text>,
         site_link -> Varchar,
         feed_link -> Varchar,
         updated_at -> Timestamp,
@@ -17,7 +17,7 @@ table! {
         title -> Varchar,
         summary -> Nullable<Text>,
         content -> Nullable<Text>,
-        published_at -> Timestamp,
+        published_at -> Nullable<Timestamp>,
         updated_at -> Nullable<Timestamp>,
         feed_id -> Int4,
     }

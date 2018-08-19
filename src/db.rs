@@ -144,10 +144,9 @@ pub fn update_item(iid: i32, item: NewItem) {
       content.eq(item.content),
     ))
     .execute(&*connection);
-  // .expect(&format!("Error updating item {} with {:?}", iid, &item));
 }
 
-pub fn find_duplicates(guids: Vec<&str>) -> Option<Vec<(i32, String, NaiveDateTime)>> {
+pub fn find_duplicates(guids: Vec<&str>) -> Option<Vec<(i32, String, Option<NaiveDateTime>)>> {
   use schema::items::dsl::*;
 
   let pool = establish_pool();
@@ -157,9 +156,9 @@ pub fn find_duplicates(guids: Vec<&str>) -> Option<Vec<(i32, String, NaiveDateTi
     .select((id, guid, published_at))
     .load(&*connection)
     .expect("Error loading items");
-  match results.len() {
-    0 => None,
-    _ => Some(results),
+  match results.is_empty() {
+    true => None,
+    false => Some(results),
   }
 }
 
@@ -183,7 +182,7 @@ pub fn get_latest_item_date(feed_id: i32) -> Option<NaiveDateTime> {
     .order(published_at.desc())
     .first::<Item>(&*connection)
   {
-    Ok(item) => Some(item.published_at),
+    Ok(item) => item.published_at,
     Err(_) => None,
   }
 }
@@ -230,9 +229,9 @@ pub fn get_subscribed_channels(uid: &i32) -> Option<Vec<Feed>> {
     .select((
       feeds::id,
       feeds::title,
+      feeds::description,
       feeds::site_link,
       feeds::feed_link,
-      feeds::description,
       feeds::updated_at,
     ))
     .load::<Feed>(&*connection)
@@ -269,9 +268,17 @@ pub fn get_subscribed_items(
         items::title,
         items::summary,
         items::published_at,
+        items::updated_at,
         subscribed_items::seen,
       ))
-      .load::<(i32, String, Option<String>, NaiveDateTime, bool)>(&*connection)
+      .load::<(
+        i32,
+        String,
+        Option<String>,
+        Option<NaiveDateTime>,
+        Option<NaiveDateTime>,
+        bool,
+      )>(&*connection)
     {
       Ok(items) => Some(
         items
@@ -308,6 +315,7 @@ pub fn get_subscribed_item(iid: i32, uid: i32) -> Option<CompositeItem> {
           link: Some(item.link),
           summary: item.summary,
           published_at: item.published_at,
+          updated_at: item.updated_at,
           content: item.content,
           seen: true,
         })

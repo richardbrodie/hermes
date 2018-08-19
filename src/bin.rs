@@ -14,7 +14,7 @@ use feeds_lib::web::start_web;
 
 fn main() {
   dotenv().ok();
-  env::set_var("RUST_LOG", "feeds=debug");
+  env::set_var("RUST_LOG", "feeds=info");
   pretty_env_logger::init();
 
   create_admin_user();
