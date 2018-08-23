@@ -29,13 +29,13 @@ pub fn router() -> Router {
   let mut router = Router::build();
   router
     .auth_handler(decode_jwt)
-    .open_route(Method::GET, "/", index)
-    .open_route(Method::GET, "/static/(.+)", show_asset)
+    .open_route(Method::GET, "/static/.*", show_asset)
     .open_route(Method::POST, "/authenticate", authenticate)
-    .closed_route(Method::GET, "/api/feeds", show_feeds)
+    .closed_route(Method::GET, "/api/feeds", index)
     .closed_route(Method::GET, r"/api/item/(\d+)", show_item)
     .closed_route(Method::GET, r"/api/items/(\d+|\d+\?.*)", show_items)
-    .closed_route(Method::POST, "/api/add_feed", add_feed);
+    .closed_route(Method::POST, "/api/add_feed", add_feed)
+    .open_route(Method::GET, "/.*", home);
   router
 }
 

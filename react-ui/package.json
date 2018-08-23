@@ -4,13 +4,13 @@
   "private": true,
   "dependencies": {
     "jwt-decode": "^2.2.0",
-    "mobx": "^5.0.3",
+    "mobx": "^5.0.4",
     "react": "^16.4.2",
     "react-dom": "^16.4.2",
     "react-infinite-scroller": "^1.2.0",
     "react-notifications-component": "^0.0.6",
     "react-router-dom": "^4.3.1",
-    "react-scripts": "1.1.4",
+    "react-scripts": "1.1.5",
     "react-timeago": "^4.1.9"
   },
   "scripts": {
