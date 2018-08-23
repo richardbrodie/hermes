@@ -18,7 +18,7 @@ use tokio_fs;
 use tokio_io;
 use url::form_urlencoded;
 
-use db::{get_subscribed_channels, get_subscribed_item, get_subscribed_items};
+use db::{get_subscribed_feeds, get_subscribed_item, get_subscribed_items};
 use feed;
 use models::{Claims, User};
 use router::Router;
@@ -31,11 +31,11 @@ pub fn router() -> Router {
     .auth_handler(decode_jwt)
     .open_route(Method::GET, "/static/.*", show_asset)
     .open_route(Method::POST, "/authenticate", authenticate)
-    .closed_route(Method::GET, "/api/feeds", index)
+    .closed_route(Method::GET, "/api/feeds", show_feeds)
     .closed_route(Method::GET, r"/api/item/(\d+)", show_item)
     .closed_route(Method::GET, r"/api/items/(\d+|\d+\?.*)", show_items)
     .closed_route(Method::POST, "/api/add_feed", add_feed)
-    .open_route(Method::GET, "/.*", home);
+    .open_route(Method::GET, "/.*", index);
   router
 }
 
@@ -96,7 +96,7 @@ fn index(_req: Request<Body>) -> ResponseFuture {
 
 fn show_feeds(_req: Request<Body>, claims: &Claims) -> ResponseFuture {
   let user_id = claims.id.clone();
-  let channels = get_subscribed_channels(&user_id);
+  let channels = get_subscribed_feeds(&user_id);
   let mut body = Body::empty();
   let mut status = StatusCode::NOT_FOUND;
   match serde_json::to_string(&channels) {

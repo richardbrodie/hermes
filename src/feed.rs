@@ -14,7 +14,7 @@ use tokio::timer::Interval;
 
 use db::{
   self, find_duplicates, get_channel_urls_and_subscribers, insert_channel, insert_items,
-  insert_subscribed_items, subscribe_channel, update_item,
+  insert_subscribed_items, update_item,
 };
 use models::{NewFeed, NewItem};
 
@@ -57,7 +57,7 @@ pub fn subscribe_feed(url: String, uid: i32) {
       add_feed(url)
     })
     .and_then(move |(ch_id, item_ids)| {
-      subscribe_channel(&uid, &ch_id);
+      db::subscribe_feed(&uid, &ch_id);
       Ok(item_ids)
     })
     .and_then(move |ids| {

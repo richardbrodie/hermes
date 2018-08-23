@@ -147,9 +147,8 @@ pub struct SubscribedFeed {
   pub site_link: String,
   pub feed_link: String,
   pub updated_at: DateTime<Utc>,
-  pub subscribed_feed_id: i32,
   pub user_id: i32,
-  pub seen_count: i32,
+  pub unseen_count: i32,
 }
 
 ///////////////

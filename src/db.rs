@@ -216,7 +216,7 @@ pub fn get_user(uname: &str) -> Option<User> {
 
 // subscribed_feeds
 
-pub fn subscribe_channel(uid: &i32, fid: &i32) {
+pub fn subscribe_feed(uid: &i32, fid: &i32) {
   use schema::subscribed_feeds::dsl::*;
 
   let pool = establish_pool();
@@ -231,77 +231,32 @@ pub fn subscribe_channel(uid: &i32, fid: &i32) {
   };
 }
 
-pub fn get_subscribed_channels(uid: &i32) -> Option<Vec<Feed>> {
-  use schema::feeds;
-  use schema::subscribed_feeds;
-
+pub fn get_subscribed_feeds(uid: &i32) -> Option<Vec<SubscribedFeed>> {
   let pool = establish_pool();
   let connection = pool.get().unwrap();
-  match subscribed_feeds::table
-    .inner_join(feeds::table)
-    .filter(subscribed_feeds::user_id.eq(uid))
-    .select((
-      feeds::id,
-      feeds::title,
-      feeds::description,
-      feeds::site_link,
-      feeds::feed_link,
-      feeds::updated_at,
-    ))
-    .load::<Feed>(&*connection)
-  {
-    Ok(feeds) => Some(feeds),
-    Err(_) => None,
-  }
+  subscribed_feeds_with_count_view::table
+    .filter(subscribed_feeds_with_count_view::user_id.eq(uid))
+    .load::<SubscribedFeed>(&*connection)
+    .ok()
 }
 
 pub fn get_subscribed_items(
   fid: i32,
   uid: i32,
   updated: Option<DateTime<Utc>>,
-) -> Option<Vec<CompositeItem>> {
-  use schema::items;
-  use schema::subscribed_items;
-
+) -> Option<Vec<SubscribedItem>> {
   let pool = establish_pool();
   let handle = thread::spawn(move || {
     let connection = pool.get().unwrap();
-    let mut query = items::table
-      .inner_join(subscribed_items::table)
-      .filter(items::feed_id.eq(fid))
-      .filter(subscribed_items::user_id.eq(uid))
-      .order(items::published_at.desc())
+    let mut query = subscribed_items_view::table
+      .filter(subscribed_items_view::feed_id.eq(fid))
+      .filter(subscribed_items_view::user_id.eq(uid))
+      .order(subscribed_items_view::published_at.desc())
       .into_boxed();
     if let Some(d) = updated {
-      query = query.filter(items::published_at.lt(d))
+      query = query.filter(subscribed_items_view::published_at.lt(d))
     }
-    match query
-      .limit(50)
-      .select((
-        items::id,
-        items::title,
-        items::summary,
-        items::published_at,
-        items::updated_at,
-        subscribed_items::seen,
-      ))
-      .load::<(
-        i32,
-        String,
-        Option<String>,
-        Option<DateTime<Utc>>,
-        Option<DateTime<Utc>>,
-        bool,
-      )>(&*connection)
-    {
-      Ok(items) => Some(
-        items
-          .into_iter()
-          .map(|i| CompositeItem::partial(i))
-          .collect(),
-      ),
-      Err(_) => None,
-    }
+    query.limit(50).load::<SubscribedItem>(&*connection).ok()
   });
   handle.join().unwrap()
 }
@@ -319,8 +274,9 @@ pub fn get_subscribed_item(iid: i32, uid: i32) -> Option<SubscribedItem> {
       .first::<SubscribedItem>(&*connection)
     {
       Ok(item) => {
-        diesel::update(subscribed_items::table.find(item.subscribed_item_id))
-          .set(subscribed_items::seen.eq(true))
+        diesel::update(
+          subscribed_items::table.filter(subscribed_items::id.eq(item.subscribed_item_id)),
+        ).set(subscribed_items::seen.eq(true))
           .execute(&*connection);
         Some(item)
       }

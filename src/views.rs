@@ -7,7 +7,7 @@ table! {
         feed_link -> Varchar,
         updated_at -> Timestamptz,
         user_id -> Int4,
-        seen_count -> Int4,
+        unseen_count -> Int4,
     }
 }
 

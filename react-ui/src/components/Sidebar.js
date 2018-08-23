@@ -22,7 +22,8 @@ class Sidebar extends Component {
           {this.state.feeds.map((feed, i) => (
             <NavLink to={`/feed/${feed.id}`}>
               <div className="router-link" key={i}>
-                {feed.title}
+                <span className="feed-title">{feed.title}</span>
+                <span className="feed-count">{feed.unseen_count}</span>
               </div>
             </NavLink>
           ))}
