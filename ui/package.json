@@ -1,0 +1,27 @@
+{
+  "name": "ui",
+  "version": "1.0.0",
+  "license": "MIT",
+  "dependencies": {
+    "jwt-decode": "^2.2.0",
+    "mobx": "^5.0.4",
+    "react": "^16.2.0",
+    "react-dom": "^16.4.2",
+    "react-infinite-scroller": "^1.2.0",
+    "react-notifications-component": "^0.0.6",
+    "react-router-dom": "^4.3.1",
+    "react-timeago": "^4.1.9",
+    "sass": "^1.13.0"
+  },
+  "devDependencies": {
+    "babel-plugin-transform-object-rest-spread": "^6.26.0",
+    "babel-preset-env": "^1.7.0",
+    "babel-preset-react": "^6.24.1",
+    "node-sass": "^4.9.3",
+    "parcel-bundler": "^1.9.7"
+  },
+  "scripts": {
+    "dev": "parcel ./src/index.html",
+    "build": "parcel build ./src/index.html/"
+  }
+}

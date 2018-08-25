@@ -20,13 +20,14 @@ use feed;
 use models::{Claims, User};
 use router::Router;
 
-static ASSET_PATH: &'static str = "react-ui/build";
+static ASSET_PATH: &'static str = "ui/dist";
 
 pub fn router() -> Router {
   let mut router = Router::build();
   router
     .auth_handler(decode_jwt)
-    .open_route(Method::GET, "/static/.*", show_asset)
+    // .open_route(Method::GET, "/static/.*", serve_static)
+    .open_route(Method::GET, r"/src\..*", serve_static)
     .open_route(Method::POST, "/authenticate", authenticate)
     .closed_route(Method::GET, "/api/feeds", show_feeds)
     .closed_route(Method::GET, r"/api/item/(\d+)", show_item)
@@ -203,9 +204,9 @@ fn show_items(req: Request<Body>, claims: &Claims) -> ResponseFuture {
   Router::response(body, status)
 }
 
-fn show_asset(req: Request<Body>) -> ResponseFuture {
+fn serve_static(req: Request<Body>) -> ResponseFuture {
   let req_path = req.uri().path();
-  let re = Regex::new(r"/static/(.+)").unwrap();
+  let re = Regex::new(r"/(src\..+)").unwrap();
   let asset_name = match re.captures(&req_path) {
     Some(d) => d.get(1).unwrap().as_str(),
     None => {
@@ -214,8 +215,7 @@ fn show_asset(req: Request<Body>) -> ResponseFuture {
     }
   };
 
-  let asset_dir = format!("{}/static", ASSET_PATH);
-  let asset_path = path::Path::new(&asset_dir).join(asset_name);
+  let asset_path = path::Path::new(&ASSET_PATH).join(asset_name);
 
   let response = tokio_fs::file::File::open(asset_path)
     .and_then(move |file| {
@@ -292,7 +292,7 @@ fn generate_jwt(user: &User) -> Option<String> {
       let token = encode(&Header::default(), &claims, &val.as_ref());
       match token {
         Ok(jwt) => {
-          info!("generated jwt: {:?}", jwt);
+          debug!("generated jwt: {:?}", jwt);
           Some(jwt)
         }
         Err(_) => None,
