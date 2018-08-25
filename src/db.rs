@@ -7,8 +7,8 @@ use r2d2_diesel::ConnectionManager;
 use std::collections::HashMap;
 use std::{env, thread};
 
-use models::{CompositeItem, Feed, Item, NewFeed, NewItem, SubscribedFeed, SubscribedItem, User};
-use schema::{feeds, items, subscribed_feeds, subscribed_items, users};
+use models::{Feed, Item, NewFeed, NewItem, SubscribedFeed, SubscribedItem, User};
+use schema::{feeds, subscribed_feeds};
 use views::{subscribed_feeds_with_count_view, subscribed_items_view};
 
 lazy_static! {
@@ -122,8 +122,6 @@ pub fn get_channel_urls_and_subscribers() -> Vec<(i32, String, Vec<i32>)> {
     .into_iter()
     .map(|(i, u)| (i, u, h.remove(&i).unwrap()))
     .collect();
-
-  // vec![(1, "2".to_string(), Vec::new())]
   res
 }
 
@@ -157,7 +155,8 @@ pub fn update_item(iid: i32, item: NewItem) {
       published_at.eq(item.published_at),
       content.eq(item.content),
     ))
-    .execute(&*connection);
+    .execute(&*connection)
+    .expect("failed to update item");
 }
 
 pub fn find_duplicates(guids: Vec<&str>) -> Option<Vec<(i32, String, Option<DateTime<Utc>>)>> {
@@ -186,13 +185,13 @@ pub fn get_item_ids(fid: &i32) -> Option<Vec<i32>> {
   }
 }
 
-pub fn get_latest_item_date(feed_id: i32) -> Option<DateTime<Utc>> {
+pub fn get_latest_item_date(fid: i32) -> Option<DateTime<Utc>> {
   use schema::items::dsl::*;
 
   let pool = establish_pool();
   let connection = pool.get().unwrap();
   match items
-    .filter(feed_id.eq(feed_id))
+    .filter(feed_id.eq(fid))
     .order(published_at.desc())
     .first::<Item>(&*connection)
   {
@@ -277,7 +276,8 @@ pub fn get_subscribed_item(iid: i32, uid: i32) -> Option<SubscribedItem> {
         diesel::update(
           subscribed_items::table.filter(subscribed_items::id.eq(item.subscribed_item_id)),
         ).set(subscribed_items::seen.eq(true))
-          .execute(&*connection);
+          .execute(&*connection)
+          .expect("Failed to update 'seen' status");
         Some(item)
       }
       Err(_) => None,
@@ -302,7 +302,7 @@ pub fn insert_subscribed_items(items: Vec<(&i32, &i32, bool)>) {
 
   let pool = establish_pool();
   let connection = pool.get().unwrap();
-  let inserted_items = diesel::insert_into(subscribed_items::table)
+  diesel::insert_into(subscribed_items::table)
     .values(insertables)
     .execute(&*connection)
     .expect("Error saving new post");

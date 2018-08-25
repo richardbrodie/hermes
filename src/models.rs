@@ -1,13 +1,12 @@
 use atom_syndication;
 use base64::{decode, encode};
-use chrono::{DateTime, FixedOffset, NaiveDateTime, Utc};
+use chrono::{DateTime, Utc};
 use rss;
 use sha2::{Digest, Sha256};
 use std::str;
 
 use db::get_user;
 use schema::*;
-use views::*;
 
 //////////
 // Feed //

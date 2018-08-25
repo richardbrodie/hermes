@@ -1,9 +1,6 @@
 use chrono::{DateTime, Utc};
 use futures::{future, Future, Stream};
-use hyper::header::{
-  ACCESS_CONTROL_ALLOW_CREDENTIALS, ACCESS_CONTROL_ALLOW_HEADERS, ACCESS_CONTROL_ALLOW_METHODS,
-  ACCESS_CONTROL_ALLOW_ORIGIN, ACCESS_CONTROL_EXPOSE_HEADERS, ALLOW, AUTHORIZATION,
-};
+use hyper::header::AUTHORIZATION;
 use hyper::service::service_fn;
 use hyper::{rt, Body, Error, Method, Request, Response, Server, StatusCode};
 use jsonwebtoken::errors::ErrorKind;
@@ -190,7 +187,7 @@ fn show_items(req: Request<Body>, claims: &Claims) -> ResponseFuture {
       match params.get("updated") {
         Some(d) => match d.parse::<DateTime<Utc>>() {
           Ok(t) => Some(t),
-          Err(err) => return Router::response(body, StatusCode::BAD_REQUEST),
+          Err(_) => return Router::response(body, StatusCode::BAD_REQUEST),
         },
         None => None,
       }
@@ -246,26 +243,6 @@ fn show_asset(req: Request<Body>) -> ResponseFuture {
   Box::new(response)
 }
 
-fn options_headers(_req: Request<Body>) -> ResponseFuture {
-  Box::new(future::ok(
-    Response::builder()
-      .header(ACCESS_CONTROL_ALLOW_ORIGIN, "*")
-      .header(ACCESS_CONTROL_ALLOW_CREDENTIALS, "true")
-      .header(ACCESS_CONTROL_EXPOSE_HEADERS, "Access-Control-*")
-      .header(
-        ACCESS_CONTROL_ALLOW_HEADERS,
-        "Access-Control-*, Origin, X-Requested-With, Content-Type, Accept, Authorization",
-      )
-      .header(
-        ACCESS_CONTROL_ALLOW_METHODS,
-        "GET, POST, PUT, PATCH, OPTIONS, HEAD",
-      )
-      .header(ALLOW, "GET, POST, PUT, PATCH, OPTIONS, HEAD")
-      .body(Body::empty())
-      .unwrap(),
-  ))
-}
-
 fn decode_jwt(req: &Request<Body>) -> Option<Claims> {
   let secret = env::var("JWT_SECRET").unwrap();
 
@@ -282,7 +259,7 @@ fn decode_jwt(req: &Request<Body>) -> Option<Claims> {
     None => return None,
   };
 
-  let mut validation = Validation {
+  let validation = Validation {
     validate_exp: false,
     ..Default::default()
   };
