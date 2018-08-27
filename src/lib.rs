@@ -29,11 +29,11 @@ extern crate tokio;
 extern crate tokio_fs;
 extern crate tokio_io;
 extern crate url;
+extern crate warp;
 
 pub mod db;
 pub mod feed;
 pub mod models;
-pub mod router;
 pub mod schema;
 pub mod views;
 pub mod web;
