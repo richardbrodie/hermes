@@ -21,7 +21,8 @@
     "parcel-bundler": "^1.9.7"
   },
   "scripts": {
-    "dev": "parcel ./src/index.html",
-    "build": "parcel build ./src/index.html/"
+    "serve": "parcel serve ./src/index.html",
+    "watch": "parcel watch ./src/index.html -d dist/static",
+    "build": "parcel build ./src/index.html/ -d dist/static"
   }
 }

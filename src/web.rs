@@ -1,8 +1,5 @@
 use chrono::{DateTime, Utc};
 use futures::{future, Future, Stream};
-// use hyper::header::AUTHORIZATION;
-// use hyper::service::service_fn;
-// use hyper::{rt, Body, Error, Method, Request, Response, Server, StatusCode};
 use jsonwebtoken::errors::ErrorKind;
 use jsonwebtoken::{decode, encode, Header, Validation};
 use regex::Regex;
@@ -10,10 +7,10 @@ use regex::Regex;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::prelude::*;
+use std::str::FromStr;
 use std::{env, path, str};
 use tokio_fs;
 use tokio_io;
-// use url::form_urlencoded;
 
 use warp::filters::BoxedFilter;
 use warp::http::{Response, StatusCode};
@@ -23,7 +20,7 @@ use db::{get_subscribed_feeds, get_subscribed_item, get_subscribed_items};
 use feed;
 use models::{Claims, User};
 
-static ASSET_PATH: &'static str = "ui/dist";
+static ASSET_PATH: &'static str = "./ui/dist/static";
 
 #[derive(Deserialize, Debug)]
 struct Login {
@@ -36,20 +33,17 @@ struct AddFeed {
   feed_url: String,
 }
 
-// pub fn router() -> Router {
-//   let mut router = Router::build();
-//   router
-//     .auth_handler(decode_jwt)
-//     // .open_route(Method::GET, "/static/.*", serve_static)
-//     .open_route(Method::GET, r"/src\..*", serve_static)
-//     .open_route(Method::POST, "/authenticate", authenticate)
-//     .closed_route(Method::GET, "/api/feeds", show_feeds)
-//     .closed_route(Method::GET, r"/api/item/(\d+)", show_item)
-//     .closed_route(Method::GET, r"/api/items/(\d+|\d+\?.*)", show_items)
-//     .closed_route(Method::POST, "/api/add_feed", add_feed)
-//     .open_route(Method::GET, "/.*", index);
-//   router
-// }
+struct AssetFile(String);
+impl FromStr for AssetFile {
+  type Err = Rejection;
+  fn from_str(s: &str) -> Result<AssetFile, Rejection> {
+    let re = Regex::new(r"(src\.\w+\.(?:css|js))").unwrap();
+    match re.captures(&s) {
+      Some(m) => Ok(AssetFile(m.get(1).unwrap().as_str().to_owned())),
+      None => Err(warp::reject::not_found()),
+    }
+  }
+}
 
 pub fn verify_token() -> impl warp::Filter<Extract = (Claims,), Error = Rejection> + Clone {
   warp::header::<String>("authorization").and_then(|token| match decode_jwt(token) {
@@ -58,28 +52,32 @@ pub fn verify_token() -> impl warp::Filter<Extract = (Claims,), Error = Rejectio
   })
 }
 
-pub fn verify_asset() -> impl warp::Filter<Extract = (String,), Error = Rejection> + Clone {
-  warp::path::param().and_then(|p: String| {
-    let re = Regex::new(r"(src\.\d+\.[css|js])").unwrap();
-    match re.captures(&p) {
-      Some(d) => Ok(d.get(1).unwrap().as_str().to_owned()),
-      None => Err(warp::reject::not_found()),
-    }
-  })
-}
+// pub fn serve_asset(
+//   p: impl From<PathBuf>,
+// ) -> impl warp::Filter<Extract = (File,), Error = Rejection> + Clone {
+//   Ok(warp::fs::file(p))
+// }
 
 pub fn start_web() {
-  let assets = warp::index().and(warp::fs::dir(ASSET_PATH)).boxed();
   let authenticate = warp::post2()
     .and(warp::path("authenticate"))
     .and(warp::path::index())
     .and(warp::body::json())
     .and_then(|payload: Login| authenticate(payload));
 
-  // let assets = warp::any()
-  //   .and(verify_asset())
-  //   .and(warp::fs::dir(ASSET_PATH))
-  //   .boxed();
+  let assets = warp::get2()
+    .and(warp::path::param::<AssetFile>())
+    .map(|asset: AssetFile| {
+      path::Path::new(&ASSET_PATH)
+        .join(asset.0)
+        .to_str()
+        .unwrap()
+        .to_owned()
+    });
+  // .map(|asset: AssetFile| asset.0)
+  // .and(warp::fs::dir(""))
+  // .and(warp::fs::dir(ASSET_PATH))
+  // .map(|_, p| {info!("{:?}",p); p});
 
   let star = warp::get2().and(warp::any()).map(|| index());
 
@@ -118,18 +116,6 @@ pub fn start_web() {
   // let routes = assets.or(authenticate).or(api).or(star);
 
   let routes = assets;
-
-  // rt::spawn(future::lazy(move || {
-  //   let service = move || {
-  //     // let router = router();
-  //     let router = routes();
-  //     service_fn(move |req| router.parse(req))
-  //   };
-  //   let server = Server::bind(&addr)
-  //     .serve(service)
-  //     .map_err(|e| error!("server error: {}", e));
-  //   server
-  // }));
   warp::serve(routes).run(([127, 0, 0, 1], 3030));
 }
 
@@ -197,44 +183,28 @@ fn show_items(
   }
 }
 
-// fn serve_static(req: Request<Body>) -> ResponseFuture {
-//   let req_path = req.uri().path();
-//   let re = Regex::new(r"/(src\..+)").unwrap();
-//   let asset_name = match re.captures(&req_path) {
-//     Some(d) => d.get(1).unwrap().as_str(),
-//     None => {
-//       warn!("no param match");
-//       return Router::response(Body::empty(), StatusCode::NOT_FOUND);
-//     }
-//   };
+fn serve_static(asset: AssetFile) -> Result<impl warp::Reply, warp::Rejection> {
+  let asset_path = path::Path::new(&ASSET_PATH).join(asset.0);
+  warp::fs::file(asset_path)
 
-//   let asset_path = path::Path::new(&ASSET_PATH).join(asset_name);
-
-//   let response = tokio_fs::file::File::open(asset_path)
-//     .and_then(move |file| {
-//       let buf: Vec<u8> = Vec::new();
-//       tokio_io::io::read_to_end(file, buf)
-//         .and_then(|item| Ok(Response::new(item.1.into())))
-//         .or_else(|_| {
-//           Ok(
-//             Response::builder()
-//               .status(StatusCode::INTERNAL_SERVER_ERROR)
-//               .body(Body::empty())
-//               .unwrap(),
-//           )
-//         })
-//     })
-//     .or_else(|e| {
-//       warn!("not found! - {}", e);
-//       Ok(
-//         Response::builder()
-//           .status(StatusCode::NOT_FOUND)
-//           .body(Body::empty())
-//           .unwrap(),
-//       )
-//     });
-//   Box::new(response)
-// }
+let response = tokio_fs::file::File::open(asset_path)
+  .and_then(move |file| {
+    let buf: Vec<u8> = Vec::new();
+    tokio_io::io::read_to_end(file, buf)
+      .and_then(|item| Ok(warp::reply(item.1.into())))
+      .or_else(|_| Err(warp::reject::server_error()))
+  })
+  .or_else(|e| {
+    warn!("not found! - {}", e);
+    Ok(
+      Response::builder()
+        .status(StatusCode::NOT_FOUND)
+        .body(Body::empty())
+        .unwrap(),
+    )
+  });
+Box::new(response)
+}
 
 fn decode_jwt(token: String) -> Result<Claims, StatusCode> {
   let secret = env::var("JWT_SECRET").unwrap();
