@@ -4,6 +4,7 @@ use chrono::{DateTime, Utc};
 use rss;
 use sha2::{Digest, Sha256};
 use std::str;
+use warp::ws::Message;
 
 use db::get_user;
 use schema::*;
@@ -154,12 +155,11 @@ pub struct SubscribedFeed {
 // Composite //
 ///////////////
 
-#[derive(Debug, Queryable, Serialize)]
+#[derive(Debug, Serialize)]
 pub struct CompositeItem {
-  pub item_id: i32,
+  pub id: i32,
   pub title: String,
-  #[serde(skip_serializing_if = "Option::is_none")]
-  pub link: Option<String>,
+  pub link: String,
   #[serde(skip_serializing_if = "Option::is_none")]
   pub summary: Option<String>,
   #[serde(skip_serializing_if = "Option::is_none")]
@@ -169,25 +169,28 @@ pub struct CompositeItem {
   pub seen: bool,
 }
 impl CompositeItem {
-  pub fn partial(
-    item: (
-      i32,
-      String,
-      Option<String>,
-      Option<DateTime<Utc>>,
-      Option<DateTime<Utc>>,
-      bool,
-    ),
-  ) -> Self {
+  pub fn from_item(item: &Item) -> Self {
     CompositeItem {
-      item_id: item.0,
-      title: item.1.to_string(),
-      link: None,
-      summary: item.2,
-      content: None,
-      published_at: item.3,
-      updated_at: item.4,
-      seen: item.5,
+      id: item.id,
+      title: item.title.clone(),
+      link: item.link.clone(),
+      summary: item.summary.clone(),
+      content: item.content.clone(),
+      published_at: item.published_at,
+      updated_at: item.updated_at,
+      seen: false,
+    }
+  }
+  pub fn from_subscribed(item: &SubscribedItem) -> Self {
+    CompositeItem {
+      id: item.id,
+      title: item.title.clone(),
+      link: item.link.clone(),
+      summary: item.summary.clone(),
+      content: item.content.clone(),
+      published_at: item.published_at,
+      updated_at: item.updated_at,
+      seen: item.seen,
     }
   }
 }
@@ -246,5 +249,28 @@ fn parse_date(date: &str) -> Option<DateTime<Utc>> {
   match DateTime::parse_from_rfc2822(date) {
     Ok(d) => Some(d.with_timezone(&Utc)),
     Err(_) => date.parse::<DateTime<Utc>>().ok(),
+  }
+}
+
+///////////////
+// Websocket //
+///////////////
+///
+#[derive(Debug, Serialize)]
+pub struct FeedUpdate<'a> {
+  pub feed: SubscribedFeed,
+  pub items: Option<&'a Vec<CompositeItem>>,
+}
+impl<'a> FeedUpdate<'a> {
+  pub fn new(feed: SubscribedFeed, items: Option<&'a Vec<CompositeItem>>) -> Self {
+    FeedUpdate {
+      feed: feed,
+      items: items,
+    }
+  }
+
+  pub fn to_message(&self) -> Message {
+    let msg = json!(self);
+    Message::text(msg.to_string())
   }
 }

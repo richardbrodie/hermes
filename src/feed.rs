@@ -1,22 +1,26 @@
 use atom_syndication;
 use futures::future::IntoFuture;
+use futures::{stream, Sink};
 use hyper::rt::{self, Future, Stream};
 use hyper::{Body, Client};
 use hyper_tls::HttpsConnector;
 use quick_xml::events::Event;
 use quick_xml::Reader;
 use rss;
+use serde_json;
 use std::io::BufReader;
 use std::option::Option;
 use std::str;
 use std::time::{Duration, Instant};
 use tokio::timer::Interval;
+use warp::ws::{Message, WebSocket};
 
 use db::{
   self, find_duplicates, get_channel_urls_and_subscribers, insert_channel, insert_items,
   insert_subscribed_items, update_item,
 };
-use models::{NewFeed, NewItem};
+use models::{CompositeItem, FeedUpdate, Item, NewFeed, NewItem};
+use web::UserWebsocketState;
 
 enum FeedType {
   RSS(rss::Channel),
@@ -31,40 +35,91 @@ enum ItemType {
 /// Future sequences ///
 ////////////////////////
 
-pub fn start_feed_loop() {
-  let task = Interval::new(Instant::now(), Duration::from_secs(120))
-    .for_each(|_| {
-      get_channel_urls_and_subscribers()
-        .into_iter()
-        .for_each(|c| update_feed(c.0, c.1, c.2));
+pub fn start_interval_loops(global_user_state: UserWebsocketState) {
+  let update_subscriptions = Interval::new(Instant::now(), Duration::from_secs(120))
+    .for_each(move |_| {
+      get_channel_urls_and_subscribers().into_iter().for_each(
+        |(feed_id, feed_url, subscriber_ids)| {
+          let local_state = global_user_state.clone();
+          let sid = subscriber_ids.clone();
+          let work = update_feed(feed_id, feed_url, subscriber_ids).and_then(move |new_items| {
+            match new_items {
+              Some(items) => {
+                info!("found {} new items for {}", items.len(), &feed_id);
+                send_updated_items(feed_id, items, &sid, &local_state);
+              }
+              None => (),
+            };
+            Ok(())
+          });
+          rt::spawn(work);
+        },
+      );
       Ok(())
     })
     .map_err(|e| panic!("delay errored; err={:?}", e));
-
-  rt::spawn(task);
+  rt::spawn(update_subscriptions);
 }
 
-pub fn subscribe_feed(url: String, uid: i32) {
-  debug!("subscribing: '{}' by '{}'", url, uid);
-  let work = db::get_channel_id(&url)
+fn send_updated_items(
+  feed_id: i32,
+  new_items: Vec<Item>,
+  subscriber_ids: &Vec<i32>,
+  state: &UserWebsocketState,
+) {
+  let composites: Vec<_> = new_items
+    .into_iter()
+    .map(|item| CompositeItem::from_item(&item))
+    .collect();
+  for uid in subscriber_ids.iter() {
+    let feed = db::get_subscribed_feed(uid, &feed_id);
+    let msg = FeedUpdate::new(feed.unwrap(), Some(&composites));
+    send_info_as_json(&uid, msg, state);
+  }
+}
+
+fn send_info_as_json(user_id: &i32, message: FeedUpdate, state: &UserWebsocketState) {
+  match state.state.lock().unwrap().get_mut(user_id) {
+    Some(mut tx) => {
+      let _ = tx.start_send(message.to_message());
+    }
+    None => (),
+  };
+}
+
+pub fn subscribe_feed(url: String, user_id: i32, state: UserWebsocketState) {
+  debug!("subscribing: '{}' by '{}'", url, user_id);
+  let work = db::get_feed_id(&url)
     .into_future()
-    .and_then(|cid| {
-      debug!("in db: '{}'", cid);
-      Ok((cid, db::get_item_ids(&cid)))
+    .and_then(|feed_id| {
+      debug!("in db: '{}'", feed_id);
+      Ok((feed_id, db::get_item_ids(&feed_id)))
     })
     .or_else(|_| {
       debug!("not in db: '{}'", url);
       add_feed(url)
     })
-    .and_then(move |(ch_id, item_ids)| {
-      db::subscribe_feed(&uid, &ch_id);
-      Ok(item_ids)
+    .and_then(move |(feed_id, item_ids)| {
+      db::subscribe_feed(&user_id, &feed_id);
+      Ok((feed_id, item_ids))
     })
-    .and_then(move |ids| {
-      Ok(match ids {
-        Some(items) => finalise_subscribed_items(items, vec![uid]),
+    .and_then(move |(feed_id, item_ids)| {
+      match item_ids {
+        Some(item_ids) => subscribe_new_items(&item_ids, &vec![user_id]),
         None => (),
-      })
+      };
+      Ok((feed_id, state))
+    })
+    .and_then(move |(feed_id, state)| {
+      let feed = db::get_subscribed_feed(&user_id, &feed_id);
+      let items = db::get_subscribed_items(feed_id, user_id, None);
+      let composites: Vec<_> = items
+        .unwrap()
+        .into_iter()
+        .map(|item| CompositeItem::from_subscribed(&item))
+        .collect();
+      let msg = FeedUpdate::new(feed.unwrap(), Some(&composites));
+      Ok(send_info_as_json(&user_id, msg, &state))
     });
   rt::spawn(work);
 }
@@ -77,25 +132,34 @@ pub fn add_feed(url: String) -> impl Future<Item = (i32, Option<Vec<i32>>), Erro
       let new_ch = insert_channel(new_feed);
       Ok((new_items, new_ch.id))
     })
-    .and_then(|(items, feed_id)| Ok((feed_id, handle_item_types(items, feed_id))))
-    .and_then(|(feed_id, items)| Ok((feed_id, insert_items(&items))))
+    .and_then(|(items, feed_id)| Ok((feed_id, handle_item_types(items, &feed_id))))
+    .and_then(|(feed_id, items)| {
+      let items = insert_items(&items).unwrap();
+      let item_ids: Vec<_> = items.into_iter().map(|i| i.id).collect();
+      Ok((feed_id, Some(item_ids)))
+    })
 }
 
-pub fn update_feed(feed_id: i32, channel_url: String, subscribers: Vec<i32>) {
-  let local = channel_url.to_owned();
-  let work = fetch_feed(channel_url)
+pub fn update_feed(
+  feed_id: i32,
+  channel_url: String,
+  subscriber_ids: Vec<i32>,
+) -> impl Future<Item = Option<Vec<Item>>, Error = ()> {
+  let local = channel_url.clone();
+  fetch_feed(channel_url)
     .and_then(|data| parse_fetched_data(&data))
     .and_then(move |data| handle_feed_types(data, &local))
-    .and_then(move |(_, items)| Ok(handle_item_types(items, feed_id)))
+    .and_then(move |(_, items)| Ok(handle_item_types(items, &feed_id)))
     .and_then(|items| Ok(process_duplicates(items)))
-    .and_then(|new_items| {
-      new_items
-        .and_then(|items| insert_items(&items))
-        .map(|i| finalise_subscribed_items(i, subscribers));
-      Ok(())
-    });
-
-  rt::spawn(work);
+    .and_then(move |new_items| match new_items {
+      Some(items) => {
+        let items = insert_items(&items).unwrap();
+        let item_ids = items.iter().map(|i| i.id).collect();
+        subscribe_new_items(&item_ids, &subscriber_ids);
+        Ok(Some(items))
+      }
+      None => Ok(None),
+    })
 }
 
 /////////////////////////
@@ -168,14 +232,14 @@ fn handle_feed_types(parsed: FeedType, url: &str) -> Result<(NewFeed, ItemType),
   }
 }
 
-fn handle_item_types(parsed: ItemType, feed_id: i32) -> Vec<NewItem> {
+fn handle_item_types(parsed: ItemType, feed_id: &i32) -> Vec<NewItem> {
   match parsed {
-    ItemType::Item(i) => process_items(i, &feed_id),
-    ItemType::Entry(i) => process_entries(i, &feed_id),
+    ItemType::Item(i) => process_items(i, feed_id),
+    ItemType::Entry(i) => process_entries(i, feed_id),
   }
 }
 
-fn finalise_subscribed_items(inserted_items: Vec<i32>, subscribers: Vec<i32>) {
+fn subscribe_new_items(inserted_items: &Vec<i32>, subscribers: &Vec<i32>) {
   let insertables: Vec<(&i32, &i32, bool)> = subscribers
     .iter()
     .flat_map(|s| {

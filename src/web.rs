@@ -1,26 +1,47 @@
 use chrono::{DateTime, Utc};
-use futures::{future, Future, Stream};
+use futures::stream::SplitSink;
+use futures::{Future, Stream};
 use jsonwebtoken::errors::ErrorKind;
 use jsonwebtoken::{decode, encode, Header, Validation};
 use regex::Regex;
-// use serde_json;
 use std::collections::HashMap;
-use std::fs::File;
-use std::io::prelude::*;
+use std::io;
 use std::str::FromStr;
+use std::sync::{Arc, Mutex};
 use std::{env, path, str};
 use tokio_fs;
 use tokio_io;
 
-use warp::filters::BoxedFilter;
+use hyper::Body;
 use warp::http::{Response, StatusCode};
-use warp::{self, Filter, Rejection, Reply};
+use warp::ws::{Message, WebSocket, Ws2};
+use warp::{self, Filter, Rejection};
 
 use db::{get_subscribed_feeds, get_subscribed_item, get_subscribed_items};
 use feed;
 use models::{Claims, User};
 
-static ASSET_PATH: &'static str = "./ui/dist/static";
+static ASSET_PATH: &'static str = "./ui/dist";
+
+#[derive(Clone, Debug)]
+pub struct UserWebsocketState {
+  pub state: Arc<Mutex<HashMap<i32, SplitSink<WebSocket>>>>,
+}
+impl UserWebsocketState {
+  pub fn clone(&self) -> Self {
+    let s2 = Arc::clone(&self.state);
+    UserWebsocketState { state: s2 }
+  }
+  pub fn insert(&self, key: i32, val: SplitSink<WebSocket>) {
+    self.state.lock().unwrap().insert(key, val);
+  }
+  pub fn remove(&self, key: &i32) {
+    self.state.lock().unwrap().remove(key);
+  }
+  // pub fn prep(&self) -> () {
+  //   self.state.lock().unwrap();
+  // }
+}
 
 #[derive(Deserialize, Debug)]
 struct Login {
@@ -46,19 +67,17 @@ impl FromStr for AssetFile {
 }
 
 pub fn verify_token() -> impl warp::Filter<Extract = (Claims,), Error = Rejection> + Clone {
-  warp::header::<String>("authorization").and_then(|token| match decode_jwt(token) {
-    Ok(claim) => Ok(claim),
-    Err(code) => Err(warp::reject()),
-  })
+  warp::path::index()
+    .and(warp::header::<String>("authorization"))
+    .and_then(|token| match decode_jwt(token) {
+      Ok(claim) => Ok(claim),
+      Err(_) => Err(warp::reject()),
+    })
 }
 
-// pub fn serve_asset(
-//   p: impl From<PathBuf>,
-// ) -> impl warp::Filter<Extract = (File,), Error = Rejection> + Clone {
-//   Ok(warp::fs::file(p))
-// }
+pub fn start_web(state: UserWebsocketState) {
+  let state2 = state.clone();
 
-pub fn start_web() {
   let authenticate = warp::post2()
     .and(warp::path("authenticate"))
     .and(warp::path::index())
@@ -67,75 +86,102 @@ pub fn start_web() {
 
   let assets = warp::get2()
     .and(warp::path::param::<AssetFile>())
-    .map(|asset: AssetFile| {
-      path::Path::new(&ASSET_PATH)
-        .join(asset.0)
-        .to_str()
-        .unwrap()
-        .to_owned()
-    });
-  // .map(|asset: AssetFile| asset.0)
-  // .and(warp::fs::dir(""))
-  // .and(warp::fs::dir(ASSET_PATH))
-  // .map(|_, p| {info!("{:?}",p); p});
+    .and_then(|a: AssetFile| serve_static(a));
 
-  let star = warp::get2().and(warp::any()).map(|| index());
+  let star = warp::get2()
+    .and(warp::any())
+    .and(warp::fs::file(format!("{}/index.html", ASSET_PATH)));
 
   // /api/feeds
   let api_feeds = warp::path("api")
     .and(warp::path("feeds"))
-    .and(warp::path::index())
     .and(verify_token())
     .map(|claims| show_feeds(claims));
   // /api/item/:item_id
   let api_item = warp::path("api")
     .and(warp::path("item"))
     .and(warp::path::param::<i32>())
-    .and(warp::path::index())
     .and(verify_token())
     .and_then(|item_id, claims| show_item(claims, item_id));
   // /api/add_feed
   let api_add_feed = warp::post2()
     .and(warp::path("api"))
     .and(warp::path("add_feed"))
-    .and(warp::path::index())
     .and(verify_token())
     .and(warp::body::json())
-    .and_then(|claims, payload: AddFeed| add_feed(claims, payload));
+    .and_then(move |claims, payload: AddFeed| {
+      let state = state.clone();
+      add_feed(claims, payload, state)
+    });
   // /api/items/:feed_id
   let api_items = warp::post2()
     .and(warp::path("api"))
     .and(warp::path("items"))
     .and(warp::path::param::<i32>())
     .and(warp::query::<HashMap<String, String>>())
-    .and(warp::path::index())
     .and(verify_token())
     .and_then(|feed_id, query: HashMap<String, String>, claims| show_items(claims, feed_id, query));
 
-  // let api = api_feeds.or(api_items).or(api_item).or(api_add_feed);
-  // let routes = assets.or(authenticate).or(api).or(star);
+  let ws = warp::path("ws").and(warp::ws2()).and(verify_token()).map(
+    move |ws: Ws2, claims: Claims| {
+      let state = state2.clone();
+      ws.on_upgrade(|websocket| ws_created(websocket, claims, state))
+    },
+  );
 
-  let routes = assets;
+  let api = api_feeds.or(api_items).or(api_item).or(api_add_feed);
+  let routes = authenticate.or(api).or(assets).or(ws).or(star);
   warp::serve(routes).run(([127, 0, 0, 1], 3030));
 }
 
-fn add_feed(claims: Claims, payload: AddFeed) -> Result<impl warp::Reply, warp::Rejection> {
+fn ws_created(
+  ws: WebSocket,
+  claims: Claims,
+  users: UserWebsocketState,
+) -> impl Future<Item = (), Error = ()> {
+  let user_id = claims.id;
+  info!("user connected: {} - {}", user_id, claims.name);
+  let (tx, rx) = ws.split();
+  // users.lock().unwrap().insert(user_id, tx);
+  users.insert(user_id, tx);
+  let users2 = users.clone();
+
+  rx.for_each(move |msg| {
+    user_incoming_msg(user_id, msg, &users);
+    Ok(())
+  }).then(move |result| {
+      user_disconnected(&user_id, &users2);
+      result
+    })
+    .map_err(move |e| {
+      info!("websocket error(uid={}): {}", &user_id, e);
+    })
+}
+
+fn user_incoming_msg(user_id: i32, msg: Message, users: &UserWebsocketState) {
+  info!("user {} sent the message: {:?}", user_id, msg);
+}
+
+fn user_disconnected(user_id: &i32, users: &UserWebsocketState) {
+  info!("good bye user: {}", user_id);
+  // users.lock().unwrap().remove(user_id);
+  users.remove(user_id);
+}
+
+fn add_feed(
+  claims: Claims,
+  payload: AddFeed,
+  state: UserWebsocketState,
+) -> Result<impl warp::Reply, warp::Rejection> {
   let u = payload.feed_url;
   match u.is_empty() {
     false => {
       debug!("feed_url: {}", u);
-      feed::subscribe_feed(u.to_owned(), claims.id);
+      feed::subscribe_feed(u.to_owned(), claims.id, state);
       Ok(warp::reply())
     }
     true => Err(warp::reject()),
   }
-}
-
-fn index() -> impl warp::Reply {
-  let mut f = File::open(format!("{}/index.html", ASSET_PATH)).unwrap();
-  let mut buffer = String::new();
-  f.read_to_string(&mut buffer).unwrap();
-  Response::builder().body(buffer)
 }
 
 fn show_feeds(claims: Claims) -> impl warp::Reply {
@@ -156,7 +202,6 @@ fn authenticate(params: Login) -> Result<impl warp::Reply, warp::Rejection> {
 
 fn show_item(claims: Claims, item_id: i32) -> Result<impl warp::Reply, warp::Rejection> {
   let user_id = claims.id.clone();
-  let mut status = StatusCode::OK;
   let got_item = get_subscribed_item(item_id, user_id);
   match got_item {
     Some(data) => Ok(warp::reply::json(&data)),
@@ -183,27 +228,22 @@ fn show_items(
   }
 }
 
-fn serve_static(asset: AssetFile) -> Result<impl warp::Reply, warp::Rejection> {
+fn serve_static(asset: AssetFile) -> impl Future<Item = Response<Body>, Error = Rejection> + Send {
   let asset_path = path::Path::new(&ASSET_PATH).join(asset.0);
-  warp::fs::file(asset_path)
-
-let response = tokio_fs::file::File::open(asset_path)
-  .and_then(move |file| {
-    let buf: Vec<u8> = Vec::new();
-    tokio_io::io::read_to_end(file, buf)
-      .and_then(|item| Ok(warp::reply(item.1.into())))
-      .or_else(|_| Err(warp::reject::server_error()))
-  })
-  .or_else(|e| {
-    warn!("not found! - {}", e);
-    Ok(
-      Response::builder()
-        .status(StatusCode::NOT_FOUND)
-        .body(Body::empty())
-        .unwrap(),
-    )
-  });
-Box::new(response)
+  tokio_fs::file::File::open(asset_path)
+    .and_then(move |file| {
+      let buf: Vec<u8> = Vec::new();
+      tokio_io::io::read_to_end(file, buf)
+        .and_then(|(_, b)| Ok(Response::builder().body(Body::from(b)).unwrap()))
+    })
+    .or_else(|e| {
+      error!("file open error: {} ", e);
+      let err = match e.kind() {
+        io::ErrorKind::NotFound => warp::reject::not_found().with(e),
+        _ => warp::reject::server_error().with(e),
+      };
+      Err(err)
+    })
 }
 
 fn decode_jwt(token: String) -> Result<Claims, StatusCode> {

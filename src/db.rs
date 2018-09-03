@@ -54,7 +54,7 @@ pub fn create_admin_user() {
 
 // channels
 
-pub fn find_channel_by_url(url: &str) -> Option<Feed> {
+pub fn find_feed_by_url(url: &str) -> Option<Feed> {
   use schema::feeds::dsl::*;
 
   let pool = establish_pool();
@@ -65,7 +65,7 @@ pub fn find_channel_by_url(url: &str) -> Option<Feed> {
   }
 }
 
-pub fn get_channel_id(url: &str) -> Result<i32, diesel::result::Error> {
+pub fn get_feed_id(url: &str) -> Result<i32, diesel::result::Error> {
   use schema::feeds::dsl::*;
 
   let pool = establish_pool();
@@ -127,19 +127,21 @@ pub fn get_channel_urls_and_subscribers() -> Vec<(i32, String, Vec<i32>)> {
 
 //items
 
-pub fn insert_items(items: &Vec<NewItem>) -> Option<Vec<i32>> {
+// pub fn insert_items(items: &Vec<NewItem>) -> Option<Vec<i32>> {
+pub fn insert_items(items: &Vec<NewItem>) -> Option<Vec<Item>> {
   use schema::items;
 
   debug!("found {} new items", items.len());
   let pool = establish_pool();
   let connection = pool.get().unwrap();
-  match diesel::insert_into(items::table)
+  diesel::insert_into(items::table)
     .values(items)
     .get_results::<Item>(&*connection)
-  {
-    Ok(items) => Some(items.into_iter().map(|i| i.id).collect()),
-    Err(_) => None,
-  }
+    .ok()
+  // {
+  //   Ok(items) => Some(items.into_iter().map(|i| i.id).collect()),
+  //   Err(_) => None,
+  // }
 }
 
 pub fn update_item(iid: i32, item: NewItem) {
@@ -230,6 +232,16 @@ pub fn subscribe_feed(uid: &i32, fid: &i32) {
   };
 }
 
+pub fn get_subscribed_feed(user_id: &i32, feed_id: &i32) -> Option<SubscribedFeed> {
+  let pool = establish_pool();
+  let connection = pool.get().unwrap();
+  subscribed_feeds_with_count_view::table
+    .filter(subscribed_feeds_with_count_view::user_id.eq(user_id))
+    .filter(subscribed_feeds_with_count_view::id.eq(feed_id))
+    .first::<SubscribedFeed>(&*connection)
+    .ok()
+}
+
 pub fn get_subscribed_feeds(uid: &i32) -> Option<Vec<SubscribedFeed>> {
   let pool = establish_pool();
   let connection = pool.get().unwrap();
@@ -240,16 +252,16 @@ pub fn get_subscribed_feeds(uid: &i32) -> Option<Vec<SubscribedFeed>> {
 }
 
 pub fn get_subscribed_items(
-  fid: i32,
-  uid: i32,
+  feed_id: i32,
+  user_id: i32,
   updated: Option<DateTime<Utc>>,
 ) -> Option<Vec<SubscribedItem>> {
   let pool = establish_pool();
   let handle = thread::spawn(move || {
     let connection = pool.get().unwrap();
     let mut query = subscribed_items_view::table
-      .filter(subscribed_items_view::feed_id.eq(fid))
-      .filter(subscribed_items_view::user_id.eq(uid))
+      .filter(subscribed_items_view::feed_id.eq(feed_id))
+      .filter(subscribed_items_view::user_id.eq(user_id))
       .order(subscribed_items_view::published_at.desc())
       .into_boxed();
     if let Some(d) = updated {
