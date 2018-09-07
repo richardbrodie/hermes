@@ -242,6 +242,7 @@ pub fn get_subscribed_feeds(uid: &i32) -> Option<Vec<SubscribedFeed>> {
   let connection = pool.get().unwrap();
   subscribed_feeds_with_count_view::table
     .filter(subscribed_feeds_with_count_view::user_id.eq(uid))
+    .order(subscribed_feeds_with_count_view::title.asc())
     .load::<SubscribedFeed>(&*connection)
     .ok()
 }

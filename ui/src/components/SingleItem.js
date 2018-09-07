@@ -1,23 +1,30 @@
 import React, { Component } from "react";
 import TimeAgo from "react-timeago";
 
-import store from "./store";
-
 import "../styles/SingleItem.css";
 
 class SingleItem extends Component {
   constructor(props) {
     super(props);
-    this.state = { item: props.location.state.item };
-    this.fetchData = this.fetchData.bind(this);
-    // this.fetchData();
-    console.log(
-      "placeholder: mark ",
-      this.state.subscribed_item_id,
-      " as read"
-    );
+    this.state = { item: props.item }
+    // console.log("constructor: ", this.state)
+    props.handler(props.match.params.id)
   }
+
+  shouldComponentUpdate(nextProps, nextState) {
+    if (nextProps.item !== this.props.item) {
+      this.setState({ item: nextProps.item })
+    }
+    if (nextState.item !== this.state.item) {
+      return true
+    }
+    return false
+  }
+
   render() {
+    if (!this.state.item) {
+      return null;
+    }
     return (
       <div id="single-item">
         <h1>
@@ -35,24 +42,12 @@ class SingleItem extends Component {
       </div>
     );
   }
-
-  fetchData() {
-    var url = `/api/item/${this.state.item.id}`;
-    var headers = new Headers({
-      "Content-Type": "application/json",
-      Authorization: "Bearer " + store.currentJWT
-    });
-    var req = new Request(url, {
-      method: "GET",
-      headers: headers
-    });
-    fetch(req)
-      .then(resp => resp.json())
-      .then(data => {
-        this.setState({ item: data });
-      })
-      .catch(error => store.msgCallback("error", error, "warning"));
-  }
+  // render() {
+  //   if (!this.state.item) {
+  //     return null;
+  //   }
+  //   return <div id="single-item">{this.state.item.title}</div>
+  // }
 }
 
 export default SingleItem;

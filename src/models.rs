@@ -257,13 +257,15 @@ fn parse_date(date: &str) -> Option<DateTime<Utc>> {
 ///////////////
 ///
 #[derive(Debug, Serialize)]
-pub struct FeedUpdate<'a> {
+pub struct FeedMessage<'a> {
+  pub feed_id: i32,
   pub feed: SubscribedFeed,
   pub items: Option<&'a Vec<CompositeItem>>,
 }
-impl<'a> FeedUpdate<'a> {
+impl<'a> FeedMessage<'a> {
   pub fn new(feed: SubscribedFeed, items: Option<&'a Vec<CompositeItem>>) -> Self {
-    FeedUpdate {
+    FeedMessage {
+      feed_id: feed.id,
       feed: feed,
       items: items,
     }

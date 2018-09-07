@@ -19,7 +19,7 @@ use db::{
   self, find_duplicates, get_channel_urls_and_subscribers, insert_channel, insert_items,
   insert_subscribed_items, update_item,
 };
-use models::{CompositeItem, FeedUpdate, Item, NewFeed, NewItem};
+use models::{CompositeItem, FeedMessage, Item, NewFeed, NewItem};
 use web::UserWebsocketState;
 
 enum FeedType {
@@ -36,7 +36,7 @@ enum ItemType {
 ////////////////////////
 
 pub fn start_interval_loops(global_user_state: UserWebsocketState) {
-  let update_subscriptions = Interval::new(Instant::now(), Duration::from_secs(120))
+  let update_subscriptions = Interval::new(Instant::now(), Duration::from_secs(30))
     .for_each(move |_| {
       get_channel_urls_and_subscribers().into_iter().for_each(
         |(feed_id, feed_url, subscriber_ids)| {
@@ -45,8 +45,8 @@ pub fn start_interval_loops(global_user_state: UserWebsocketState) {
           let work = update_feed(feed_id, feed_url, subscriber_ids).and_then(move |new_items| {
             match new_items {
               Some(items) => {
-                info!("found {} new items for {}", items.len(), &feed_id);
-                send_updated_items(feed_id, items, &sid, &local_state);
+                debug!("found {} new items for {}", items.len(), &feed_id);
+                send_ws_message(feed_id, items, &sid, &local_state);
               }
               None => (),
             };
@@ -61,7 +61,7 @@ pub fn start_interval_loops(global_user_state: UserWebsocketState) {
   rt::spawn(update_subscriptions);
 }
 
-fn send_updated_items(
+fn send_ws_message(
   feed_id: i32,
   new_items: Vec<Item>,
   subscriber_ids: &Vec<i32>,
@@ -73,12 +73,12 @@ fn send_updated_items(
     .collect();
   for uid in subscriber_ids.iter() {
     let feed = db::get_subscribed_feed(uid, &feed_id);
-    let msg = FeedUpdate::new(feed.unwrap(), Some(&composites));
+    let msg = FeedMessage::new(feed.unwrap(), Some(&composites));
     send_info_as_json(&uid, msg, state);
   }
 }
 
-fn send_info_as_json(user_id: &i32, message: FeedUpdate, state: &UserWebsocketState) {
+fn send_info_as_json(user_id: &i32, message: FeedMessage, state: &UserWebsocketState) {
   match state.state.lock().unwrap().get_mut(user_id) {
     Some(mut tx) => {
       let _ = tx.start_send(message.to_message());
@@ -118,7 +118,7 @@ pub fn subscribe_feed(url: String, user_id: i32, state: UserWebsocketState) {
         .into_iter()
         .map(|item| CompositeItem::from_subscribed(&item))
         .collect();
-      let msg = FeedUpdate::new(feed.unwrap(), Some(&composites));
+      let msg = FeedMessage::new(feed.unwrap(), Some(&composites));
       Ok(send_info_as_json(&user_id, msg, &state))
     });
   rt::spawn(work);

@@ -1,4 +1,4 @@
-import { observable } from 'mobx'
+import { observable, computed } from 'mobx'
 import JwtDecode from 'jwt-decode';
 
 const store = observable({
@@ -22,6 +22,10 @@ const store = observable({
 
   get tokenData() {
     return this.currentJWT ? JwtDecode(this.currentJWT) : null
+  },
+
+  get accessToken() {
+    return `?access_token=${this.currentJWT}`
   },
 
   setMsgCallback(handler) {

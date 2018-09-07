@@ -18,7 +18,7 @@ use warp::http::{Response, StatusCode};
 use warp::ws::{Message, WebSocket, Ws2};
 use warp::{self, Filter, Rejection};
 
-use db::{get_subscribed_feeds, get_subscribed_item, get_subscribed_items};
+use db::{self, get_subscribed_feeds, get_subscribed_item, get_subscribed_items};
 use feed;
 use models::{Claims, User};
 
@@ -75,7 +75,7 @@ struct AssetFile(String);
 impl FromStr for AssetFile {
   type Err = Rejection;
   fn from_str(s: &str) -> Result<AssetFile, Rejection> {
-    let re = Regex::new(r"(src\.\w+\.(?:css|js))").unwrap();
+    let re = Regex::new(r"((?:src|favicon)\.\w+\.(?:css|js|png))").unwrap();
     match re.captures(&s) {
       Some(m) => Ok(AssetFile(m.get(1).unwrap().as_str().to_owned())),
       None => Err(warp::reject::not_found()),
@@ -119,7 +119,7 @@ pub fn start_web(state: UserWebsocketState) {
   let api_feeds = warp::path("api")
     .and(warp::path("feeds"))
     .and(jwt_auth)
-    .map(|claims| show_feeds(claims));
+    .and_then(|claims| show_feeds(claims));
   // /api/item/:item_id
   let api_item = warp::path("api")
     .and(warp::path("item"))
@@ -127,17 +127,17 @@ pub fn start_web(state: UserWebsocketState) {
     .and(jwt_auth)
     .and_then(|item_id, claims| show_item(claims, item_id));
   // /api/add_feed
-  let api_add_feed = warp::post2()
-    .and(warp::path("api"))
-    .and(warp::path("add_feed"))
-    .and(jwt_auth)
-    .and(warp::body::json())
-    .and_then(move |claims: Claims, payload: AddFeed| {
-      let state = state.clone();
-      add_feed(claims.id, payload.feed_url, state)
-    });
+  // let api_add_feed = warp::post2()
+  //   .and(warp::path("api"))
+  //   .and(warp::path("add_feed"))
+  //   .and(jwt_auth)
+  //   .and(warp::body::json())
+  //   .map(move |claims: Claims, payload: AddFeed| {
+  //     feed::subscribe_feed(payload.feed_url, claims.id, state.clone());
+  //     warp::reply()
+  //   });
   // /api/items/:feed_id
-  let api_items = warp::post2()
+  let api_items = warp::get2()
     .and(warp::path("api"))
     .and(warp::path("items"))
     .and(warp::path::param::<i32>())
@@ -153,7 +153,8 @@ pub fn start_web(state: UserWebsocketState) {
       ws.on_upgrade(|websocket| ws_created(websocket, claims, state))
     });
 
-  let api = api_feeds.or(api_items).or(api_item).or(api_add_feed);
+  // let api = api_feeds.or(api_items).or(api_item).or(api_add_feed);
+  let api = api_feeds.or(api_items).or(api_item);
   let routes = authenticate.or(api).or(assets).or(ws).or(star);
   warp::serve(routes).run(([127, 0, 0, 1], 3030));
 }
@@ -164,7 +165,7 @@ fn ws_created(
   users: UserWebsocketState,
 ) -> impl Future<Item = (), Error = ()> {
   let user_id = claims.id;
-  info!("user connected: {} - {}", user_id, claims.name);
+  // info!("user connected: {} - {}", user_id, claims.name);
   let (tx, rx) = ws.split();
   users.insert(user_id, tx);
   let users2 = users.clone();
@@ -186,6 +187,7 @@ fn user_incoming_msg(user_id: i32, msg: Message, users: &UserWebsocketState) {
     Ok(message) => match message.msg_type {
       UserMessageType::MarkRead => {
         info!("user {} read item {}", user_id, message.data);
+        db::mark_subscribed_item_as_read(message.data.parse::<i32>().unwrap());
       }
       UserMessageType::Subscribe => {
         debug!("user {} subscribed to {}", user_id, message.data);
@@ -197,13 +199,15 @@ fn user_incoming_msg(user_id: i32, msg: Message, users: &UserWebsocketState) {
 }
 
 fn user_disconnected(user_id: &i32, users: &UserWebsocketState) {
-  info!("good bye user: {}", user_id);
+  // info!("good bye user: {}", user_id);
   users.remove(user_id);
 }
 
-fn show_feeds(claims: Claims) -> impl warp::Reply {
-  let channels = get_subscribed_feeds(&claims.id);
-  warp::reply::json(&channels)
+fn show_feeds(claims: Claims) -> Result<impl warp::Reply, warp::Rejection> {
+  match get_subscribed_feeds(&claims.id) {
+    Some(mut feeds) => Ok(warp::reply::json(&feeds)),
+    None => Err(warp::reject::not_found()),
+  }
 }
 
 fn authenticate(params: Login) -> Result<impl warp::Reply, warp::Rejection> {
@@ -221,7 +225,10 @@ fn show_item(claims: Claims, item_id: i32) -> Result<impl warp::Reply, warp::Rej
   let user_id = claims.id.clone();
   let got_item = get_subscribed_item(item_id, user_id);
   match got_item {
-    Some(data) => Ok(warp::reply::json(&data)),
+    Some(mut data) => {
+      data.seen = true;
+      Ok(warp::reply::json(&data))
+    }
     None => Err(warp::reject::bad_request()),
   }
 }
