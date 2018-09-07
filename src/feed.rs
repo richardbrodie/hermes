@@ -289,7 +289,7 @@ fn process_duplicates(items: Vec<NewItem>) -> Option<Vec<NewItem>> {
           }
         })
         .collect();
-      info!("found {} updated items", updated_items.len());
+      debug!("found {} updated items", updated_items.len());
       updated_items
         .into_iter()
         .for_each(|(id, item)| update_item(id, item));

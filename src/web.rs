@@ -4,6 +4,7 @@ use futures::{Future, Stream};
 use jsonwebtoken::errors::ErrorKind;
 use jsonwebtoken::{decode, encode, Header, Validation};
 use regex::Regex;
+use serde_json;
 use std::collections::HashMap;
 use std::io;
 use std::str::FromStr;
@@ -21,7 +22,7 @@ use db::{get_subscribed_feeds, get_subscribed_item, get_subscribed_items};
 use feed;
 use models::{Claims, User};
 
-static ASSET_PATH: &'static str = "./ui/dist";
+static ASSET_PATH: &'static str = "./ui/dist/static";
 
 #[derive(Clone, Debug)]
 pub struct UserWebsocketState {
@@ -54,6 +55,22 @@ struct AddFeed {
   feed_url: String,
 }
 
+#[derive(Deserialize, Debug)]
+enum UserMessageType {
+  MarkRead,
+  Subscribe,
+}
+
+#[derive(Deserialize, Debug)]
+struct UserMessage {
+  msg_type: UserMessageType,
+  data: String,
+}
+#[derive(Deserialize, Debug)]
+struct AccessToken {
+  access_token: String,
+}
+
 struct AssetFile(String);
 impl FromStr for AssetFile {
   type Err = Rejection;
@@ -69,14 +86,20 @@ impl FromStr for AssetFile {
 pub fn verify_token() -> impl warp::Filter<Extract = (Claims,), Error = Rejection> + Clone {
   warp::path::index()
     .and(warp::header::<String>("authorization"))
-    .and_then(|token| match decode_jwt(token) {
-      Ok(claim) => Ok(claim),
-      Err(_) => Err(warp::reject()),
-    })
+    .and_then(make_claim)
+}
+
+pub fn make_claim(token: String) -> Result<Claims, Rejection> {
+  match decode_jwt(token) {
+    Ok(claim) => Ok(claim),
+    Err(_) => Err(warp::reject()),
+  }
 }
 
 pub fn start_web(state: UserWebsocketState) {
   let state2 = state.clone();
+  let jwt_auth =
+    warp::query::<AccessToken>().and_then(|token: AccessToken| make_claim(token.access_token));
 
   let authenticate = warp::post2()
     .and(warp::path("authenticate"))
@@ -95,23 +118,23 @@ pub fn start_web(state: UserWebsocketState) {
   // /api/feeds
   let api_feeds = warp::path("api")
     .and(warp::path("feeds"))
-    .and(verify_token())
+    .and(jwt_auth)
     .map(|claims| show_feeds(claims));
   // /api/item/:item_id
   let api_item = warp::path("api")
     .and(warp::path("item"))
     .and(warp::path::param::<i32>())
-    .and(verify_token())
+    .and(jwt_auth)
     .and_then(|item_id, claims| show_item(claims, item_id));
   // /api/add_feed
   let api_add_feed = warp::post2()
     .and(warp::path("api"))
     .and(warp::path("add_feed"))
-    .and(verify_token())
+    .and(jwt_auth)
     .and(warp::body::json())
-    .and_then(move |claims, payload: AddFeed| {
+    .and_then(move |claims: Claims, payload: AddFeed| {
       let state = state.clone();
-      add_feed(claims, payload, state)
+      add_feed(claims.id, payload.feed_url, state)
     });
   // /api/items/:feed_id
   let api_items = warp::post2()
@@ -119,15 +142,16 @@ pub fn start_web(state: UserWebsocketState) {
     .and(warp::path("items"))
     .and(warp::path::param::<i32>())
     .and(warp::query::<HashMap<String, String>>())
-    .and(verify_token())
+    .and(jwt_auth)
     .and_then(|feed_id, query: HashMap<String, String>, claims| show_items(claims, feed_id, query));
 
-  let ws = warp::path("ws").and(warp::ws2()).and(verify_token()).map(
-    move |ws: Ws2, claims: Claims| {
+  let ws = warp::path("ws")
+    .and(warp::ws2())
+    .and(jwt_auth)
+    .map(move |ws: Ws2, claims: Claims| {
       let state = state2.clone();
       ws.on_upgrade(|websocket| ws_created(websocket, claims, state))
-    },
-  );
+    });
 
   let api = api_feeds.or(api_items).or(api_item).or(api_add_feed);
   let routes = authenticate.or(api).or(assets).or(ws).or(star);
@@ -142,7 +166,6 @@ fn ws_created(
   let user_id = claims.id;
   info!("user connected: {} - {}", user_id, claims.name);
   let (tx, rx) = ws.split();
-  // users.lock().unwrap().insert(user_id, tx);
   users.insert(user_id, tx);
   let users2 = users.clone();
 
@@ -159,29 +182,23 @@ fn ws_created(
 }
 
 fn user_incoming_msg(user_id: i32, msg: Message, users: &UserWebsocketState) {
-  info!("user {} sent the message: {:?}", user_id, msg);
+  match serde_json::from_str::<UserMessage>(msg.to_str().unwrap()) {
+    Ok(message) => match message.msg_type {
+      UserMessageType::MarkRead => {
+        info!("user {} read item {}", user_id, message.data);
+      }
+      UserMessageType::Subscribe => {
+        debug!("user {} subscribed to {}", user_id, message.data);
+        feed::subscribe_feed(message.data, user_id, users.to_owned());
+      }
+    },
+    Err(_) => error!("Could not parse {:?} as a UserMessage", msg),
+  };
 }
 
 fn user_disconnected(user_id: &i32, users: &UserWebsocketState) {
   info!("good bye user: {}", user_id);
-  // users.lock().unwrap().remove(user_id);
   users.remove(user_id);
-}
-
-fn add_feed(
-  claims: Claims,
-  payload: AddFeed,
-  state: UserWebsocketState,
-) -> Result<impl warp::Reply, warp::Rejection> {
-  let u = payload.feed_url;
-  match u.is_empty() {
-    false => {
-      debug!("feed_url: {}", u);
-      feed::subscribe_feed(u.to_owned(), claims.id, state);
-      Ok(warp::reply())
-    }
-    true => Err(warp::reject()),
-  }
 }
 
 fn show_feeds(claims: Claims) -> impl warp::Reply {
@@ -249,12 +266,13 @@ fn serve_static(asset: AssetFile) -> impl Future<Item = Response<Body>, Error = 
 fn decode_jwt(token: String) -> Result<Claims, StatusCode> {
   let secret = env::var("JWT_SECRET").unwrap();
 
-  let r = r"^Bearer\s([\w_-]+\.[\w_-]+\.[\w=_-]+)$";
-  let regex = Regex::new(&r).unwrap();
-  let t = match regex.captures(&token) {
-    Some(d) => d.get(1).unwrap().as_str(),
-    None => return Err(StatusCode::UNAUTHORIZED),
-  };
+  // let r = r"^Bearer\s([\w_-]+\.[\w_-]+\.[\w=_-]+)$";
+  // let regex = Regex::new(&r).unwrap();
+  // let t = match regex.captures(&token) {
+  //   Some(d) => d.get(1).unwrap().as_str(),
+  //   None => return Err(StatusCode::UNAUTHORIZED),
+  // };
+  let t = token;
 
   let validation = Validation {
     validate_exp: false,

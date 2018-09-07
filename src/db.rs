@@ -127,7 +127,6 @@ pub fn get_channel_urls_and_subscribers() -> Vec<(i32, String, Vec<i32>)> {
 
 //items
 
-// pub fn insert_items(items: &Vec<NewItem>) -> Option<Vec<i32>> {
 pub fn insert_items(items: &Vec<NewItem>) -> Option<Vec<Item>> {
   use schema::items;
 
@@ -138,10 +137,6 @@ pub fn insert_items(items: &Vec<NewItem>) -> Option<Vec<Item>> {
     .values(items)
     .get_results::<Item>(&*connection)
     .ok()
-  // {
-  //   Ok(items) => Some(items.into_iter().map(|i| i.id).collect()),
-  //   Err(_) => None,
-  // }
 }
 
 pub fn update_item(iid: i32, item: NewItem) {
@@ -296,6 +291,17 @@ pub fn get_subscribed_item(iid: i32, uid: i32) -> Option<SubscribedItem> {
     }
   });
   handle.join().unwrap()
+}
+
+pub fn mark_subscribed_item_as_read(iid: i32) {
+  use schema::subscribed_items;
+  let pool = establish_pool();
+  let connection = pool.get().unwrap();
+
+  diesel::update(subscribed_items::table.filter(subscribed_items::id.eq(iid)))
+    .set(subscribed_items::seen.eq(true))
+    .execute(&*connection)
+    .expect("Failed to update 'seen' status");
 }
 
 pub fn insert_subscribed_items(items: Vec<(&i32, &i32, bool)>) {
