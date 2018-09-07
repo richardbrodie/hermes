@@ -16,13 +16,12 @@ class AddFeed extends Component {
   }
 
   addFeed(feedUrl) {
-    var url = '/api/add_feed';
+    var url = `/api/add_feed?access_token=${store.currentJWT}`;
     var body = JSON.stringify({
       feed_url: feedUrl
     });
     var headers = new Headers({
       'Content-Type': 'application/json',
-      Authorization: 'Bearer ' + store.currentJWT
     });
     var req = new Request(url, {
       method: 'POST',
