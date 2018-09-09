@@ -1,16 +1,16 @@
 extern crate diesel;
 extern crate dotenv;
-extern crate feeds_lib;
+extern crate hermes_lib;
 
 use diesel::prelude::*;
 use dotenv::dotenv;
 use std::env;
 
-use feeds_lib::db::establish_pool;
-use feeds_lib::models::User;
+use hermes_lib::db::establish_pool;
+use hermes_lib::models::User;
 
 fn main() {
-  use feeds_lib::schema::users::dsl::*;
+  use hermes_lib::schema::users::dsl::*;
   dotenv().ok();
 
   let pool = establish_pool();

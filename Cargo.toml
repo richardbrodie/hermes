@@ -1,5 +1,5 @@
 [package]
-name = "feeds"
+name = "hermes"
 version = "0.1.0"
 authors = ["richard <richard@radagast.nu>"]
 
@@ -34,11 +34,11 @@ url = "1.7.0"
 warp = ""
 
 [lib]
-name = "feeds_lib"
+name = "hermes_lib"
 path = "src/lib.rs"
 
 [[bin]]
-name = "feeds"
+name = "hermes"
 path = "src/bin.rs"
 
 [[bin]]

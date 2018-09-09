@@ -4,7 +4,7 @@ extern crate hyper;
 extern crate pretty_env_logger;
 extern crate warp;
 
-extern crate feeds_lib;
+extern crate hermes_lib;
 
 use dotenv::dotenv;
 use hyper::rt;
@@ -12,13 +12,13 @@ use std::collections::HashMap;
 use std::env;
 use std::sync::{Arc, Mutex};
 
-use feeds_lib::db::create_admin_user;
-use feeds_lib::feed::start_interval_loops;
-use feeds_lib::web::{start_web, UserWebsocketState};
+use hermes_lib::db::create_admin_user;
+use hermes_lib::feed::start_interval_loops;
+use hermes_lib::web::{start_web, UserWebsocketState};
 
 fn main() {
   dotenv().ok();
-  env::set_var("RUST_LOG", "feeds=info");
+  env::set_var("RUST_LOG", "hermes=info");
   pretty_env_logger::init();
 
   create_admin_user();

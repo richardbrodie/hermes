@@ -3,6 +3,8 @@
   "version": "1.0.0",
   "license": "MIT",
   "dependencies": {
+    "eslint": "^5.5.0",
+    "eslint-plugin-react": "^7.11.1",
     "jwt-decode": "^2.2.0",
     "mobx": "^5.0.4",
     "react": "^16.5.0",

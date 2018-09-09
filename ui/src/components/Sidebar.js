@@ -1,15 +1,15 @@
-import React, { Component } from 'react';
-import { NavLink, Link } from 'react-router-dom';
+import React, { Component } from "react"
+import { NavLink, Link } from "react-router-dom"
 
-import '../styles/Sidebar.css';
+import "../styles/Sidebar.css"
 
 class Sidebar extends Component {
   constructor(props) {
-    super(props);
-    this.state = { feeds: props.feeds_data };
+    super(props)
+    this.state = { feeds: props.feeds_data }
   }
 
-  shouldComponentUpdate(nextProps, nextState) {
+  shouldComponentUpdate(nextProps, _nextState) {
     if (nextProps.feeds_data !== this.state.feeds) {
       this.setState({ feeds: nextProps.feeds_data })
       return true
@@ -18,7 +18,7 @@ class Sidebar extends Component {
   }
 
   render() {
-    const feeds = this.state.feeds;
+    const feeds = this.state.feeds
     return (
       <div id="sidebar">
         <div id="top-bar">
@@ -43,8 +43,8 @@ class Sidebar extends Component {
           </Link>
         </div>
       </div>
-    );
+    )
   }
 }
 
-export default Sidebar;
+export default Sidebar

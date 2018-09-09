@@ -34,7 +34,7 @@ RUN apt update && apt install -y libssl-dev openssl libpq5 netcat-openbsd ca-cer
 WORKDIR /app
 RUN mkdir ./react-ui
 RUN mkdir ./react-ui/build
-COPY --from=build app/target/release/feeds .
+COPY --from=build app/target/release/hermes .
 COPY --from=build app/target/release/add_user .
 COPY --from=build app/react-ui/build ./react-ui/build
 COPY --from=build /usr/local/cargo/bin/diesel /usr/bin/diesel

@@ -1,11 +1,11 @@
-import React, { Component } from "react";
-import TimeAgo from "react-timeago";
+import React, { Component } from "react"
+import TimeAgo from "react-timeago"
 
-import "../styles/SingleItem.css";
+import "../styles/SingleItem.css"
 
 class SingleItem extends Component {
   constructor(props) {
-    super(props);
+    super(props)
     this.state = { item: props.item }
     // console.log("constructor: ", this.state)
     props.handler(props.match.params.id)
@@ -23,7 +23,7 @@ class SingleItem extends Component {
 
   render() {
     if (!this.state.item) {
-      return null;
+      return null
     }
     return (
       <div id="single-item">
@@ -40,7 +40,7 @@ class SingleItem extends Component {
         <p>{this.state.item.summary}</p>
         <p dangerouslySetInnerHTML={{ __html: this.state.item.content }} />
       </div>
-    );
+    )
   }
   // render() {
   //   if (!this.state.item) {
@@ -50,4 +50,4 @@ class SingleItem extends Component {
   // }
 }
 
-export default SingleItem;
+export default SingleItem
