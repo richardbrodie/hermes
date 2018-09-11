@@ -20,7 +20,8 @@ export default class Main extends Component {
       selected_feed_id: null,
       items_data: new Array(),
       selected_item_id: null,
-      selected_item: null
+      selected_item: null,
+      last_date: null
     }
     this.fetch_feeds();
     this.select_feed_handler = this.select_feed_handler.bind(this)
@@ -36,7 +37,7 @@ export default class Main extends Component {
 
         <Switch>
           <Route path="/feed/:id"
-            render={(props) => <ItemList {...props} handler={this.select_feed_handler} items_data={this.state.items_data} />} />
+            render={(props) => <ItemList {...props} handler={this.select_feed_handler} items_data={this.state.items_data} last_date={this.state.last_date} />} />
           <Route path="/add" render={(props) => <AddFeed {...props} handler={this.send_add_new_feed_handler} />} />
           <Route path="/item/:id" render={(props) => <SingleItem {...props} handler={this.select_item_handler} item={this.state.selected_item} />} />
         </Switch>
@@ -49,7 +50,6 @@ export default class Main extends Component {
     const url = `ws://${window.location.host}/ws?access_token=${store.currentJWT}`;
     return new Sockette(url, {
       maxAttempts: 10,
-      onopen: e => console.log('Connected!', e),
       onmessage: e => {
         var data = JSON.parse(e.data)
         if (data.feed) {
@@ -61,7 +61,6 @@ export default class Main extends Component {
       },
       onreconnect: e => console.log('Reconnecting...', e),
       onmaximum: e => console.log('Stop Attempting!', e),
-      onclose: e => console.log('Closed!', e),
       onerror: e => console.log('Error:', e)
     });
   }
@@ -111,15 +110,14 @@ export default class Main extends Component {
   select_item_handler(id) {
     var item = this.state.items_data.find(i => i.id == id)
     if (item) {
-      item = this.mark_item_as_read(item)
-      this.setState({ selected_item: item, selected_item_id: id })
+      this.mark_item_as_read(item, id)
     } else {
       this.fetch_item(id)
     }
   }
 
   update_feed_handler(obj) {
-    var new_feeds = this.state.feeds_data.filter(feed => feed.id != obj.feed_id);
+    var new_feeds = this.state.feeds_data.filter(f => f.id != obj.feed_id);
     new_feeds.push(obj.feed)
     new_feeds.sort((f1, f2) => {
       var nameA = f1.title.toUpperCase();
@@ -142,24 +140,25 @@ export default class Main extends Component {
     this.state.ws_handler.send(JSON.stringify(data))
   }
 
-  mark_item_as_read(item) {
+  mark_item_as_read(item, id) {
     let new_items = this.state.items_data
     let new_feeds = this.state.feeds_data
 
     let item_index = new_items.indexOf(item)
     item.seen = true
     new_items.splice(item_index, 1, item)
+    this.setState({ selected_item: item, selected_item_id: id, items_data: new_items })
 
     let feed = new_feeds.find(f => f.id == item.feed_id)
     let feed_index = new_feeds.indexOf(feed)
     feed.unseen_count--;
     new_feeds.splice(feed_index, 1, feed)
+    this.setState({ feeds_data: new_feeds })
 
     let data = { msg_type: "MarkRead", data: item.subscribed_item_id.toString() }
     if (this.state.ws_handler) {
       this.state.ws_handler.send(JSON.stringify(data))
     }
-    this.setState({ items_data: new_items, feeds_data: new_feeds })
     return item
   }
 }

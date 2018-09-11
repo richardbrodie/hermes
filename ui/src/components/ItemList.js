@@ -1,22 +1,27 @@
 import React, { Component } from 'react';
 import { Link } from 'react-router-dom';
 import TimeAgo from 'react-timeago';
+import InfiniteScroll from 'react-infinite-scroller';
 
 import '../styles/ItemList.css';
 
 class ItemList extends Component {
   constructor(props) {
     super(props);
-    this.state = { items_data: props.items_data }
+    this.state = {
+      items_data: props.items_data,
+    }
     this.props.handler(props.match.params.id)
   }
 
   shouldComponentUpdate(nextProps, nextState) {
     if (nextProps.match.params.id !== this.props.match.params.id) {
       this.props.handler(nextProps.match.params.id)
+      return false
     }
     if (nextProps.items_data !== this.props.items_data) {
       this.setState({ items_data: nextProps.items_data })
+      return false
     }
     if (nextState.items_data !== this.state.items_data) {
       return true
@@ -25,9 +30,8 @@ class ItemList extends Component {
   }
 
   render() {
-    if (!this.state.items_data) {
-      return null;
-    }
+    if (!this.state.items_data) { return null; }
+
     var items = [];
     this.state.items_data.map((item, i) =>
       items.push(
@@ -43,8 +47,18 @@ class ItemList extends Component {
 
     return (
       <div id="feed-items">
-        {items}
-      </div>
+        <InfiniteScroll
+          pageStart={0}
+          loadMore={() => {
+            console.log("f")
+          }}
+          hasMore={true}
+          initialLoad={false}
+          useWindow={false}
+        >
+          {items}
+        </InfiniteScroll>
+      </div >
     );
   }
 }

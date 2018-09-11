@@ -1,9 +1,9 @@
-import React, { PureComponent } from "react"
+import React, { Component } from "react"
 import { NavLink, Link } from "react-router-dom"
 
 import "../styles/Sidebar.css"
 
-class Sidebar extends PureComponent {
+class Sidebar extends Component {
   render() {
     const feeds = this.props.feeds_data
     return (
