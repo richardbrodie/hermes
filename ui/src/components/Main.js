@@ -13,9 +13,9 @@ import "../styles/Main.css"
 export default class Main extends Component {
   constructor(props) {
     super(props);
-    // const ws = this.setup_socket();
+    const ws = this.setup_socket();
     this.state = {
-      // ws_handler: ws,
+      ws_handler: ws,
       feeds_data: new Array(),
       selected_feed_id: null,
       items_data: new Array(),
@@ -104,6 +104,7 @@ export default class Main extends Component {
 
   // callback handlers
   select_feed_handler(id) {
+    this.setState({ items_data: [] })
     this.fetch_items(id)
   }
 

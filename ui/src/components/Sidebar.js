@@ -1,24 +1,11 @@
-import React, { Component } from "react"
+import React, { PureComponent } from "react"
 import { NavLink, Link } from "react-router-dom"
 
 import "../styles/Sidebar.css"
 
-class Sidebar extends Component {
-  constructor(props) {
-    super(props)
-    this.state = { feeds: props.feeds_data }
-  }
-
-  shouldComponentUpdate(nextProps, _nextState) {
-    if (nextProps.feeds_data !== this.state.feeds) {
-      this.setState({ feeds: nextProps.feeds_data })
-      return true
-    }
-    return false
-  }
-
+class Sidebar extends PureComponent {
   render() {
-    const feeds = this.state.feeds
+    const feeds = this.props.feeds_data
     return (
       <div id="sidebar">
         <div id="top-bar">
@@ -35,12 +22,8 @@ class Sidebar extends Component {
           ))}
         </nav>
         <div className="btnCtr">
-          <Link className="menuItem" to="/add">
-            Add feed
-          </Link>
-          <Link className="menuItem" to="/add">
-            Settings
-          </Link>
+          <Link className="menuItem" to="/add"> Add feed </Link>
+          <Link className="menuItem" to="/add"> Settings </Link>
         </div>
       </div>
     )

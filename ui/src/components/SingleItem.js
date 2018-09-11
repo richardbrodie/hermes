@@ -7,7 +7,6 @@ class SingleItem extends Component {
   constructor(props) {
     super(props)
     this.state = { item: props.item }
-    // console.log("constructor: ", this.state)
     props.handler(props.match.params.id)
   }
 
@@ -42,12 +41,6 @@ class SingleItem extends Component {
       </div>
     )
   }
-  // render() {
-  //   if (!this.state.item) {
-  //     return null;
-  //   }
-  //   return <div id="single-item">{this.state.item.title}</div>
-  // }
 }
 
 export default SingleItem
