@@ -79,11 +79,27 @@ export default class Main extends Component {
 
   fetch_items(id) {
     var url = `/api/items/${id}${store.accessToken}`;
+    if (this.state.last_date) {
+      url = `${url}&updated=${this.state.last_date}`;
+    }
     var req = make_req(url, 'GET');
     fetch(req)
       .then(resp => resp.json())
       .then(data => {
-        if (data) { this.setState({ items_data: data, selected_feed_id: id }); }
+        if (data) {
+          let last_date = data[data.length - 1].published_at;
+          if (this.state.last_date) {
+            this.setState((prevState, _props) => ({
+              last_date: last_date,
+              items_data: prevState.items_data.concat(data)
+            }));
+          } else {
+            this.setState({
+              last_date: last_date,
+              items_data: data
+            });
+          }
+        }
       })
       .catch(error => store.msgCallback('error', error, 'warning'));
   }
@@ -103,8 +119,11 @@ export default class Main extends Component {
 
   // callback handlers
   select_feed_handler(id) {
-    this.setState({ items_data: [] })
+    this.setState({ items_data: [], selected_feed_id: id, last_date: null })
     this.fetch_items(id)
+  }
+  load_more_handler() {
+    this.fetch_items(this.state.selected_feed_id)
   }
 
   select_item_handler(id) {
