@@ -8,32 +8,26 @@ import '../styles/ItemList.css';
 class ItemList extends Component {
   constructor(props) {
     super(props);
-    this.state = {
-      items_data: props.items_data,
-    }
     this.props.handler(props.match.params.id)
   }
 
-  shouldComponentUpdate(nextProps, nextState) {
+  shouldComponentUpdate(nextProps) {
     if (nextProps.match.params.id !== this.props.match.params.id) {
       this.props.handler(nextProps.match.params.id)
       return false
     }
     if (nextProps.items_data !== this.props.items_data) {
-      this.setState({ items_data: nextProps.items_data })
-      return false
-    }
-    if (nextState.items_data !== this.state.items_data) {
       return true
     }
     return false
   }
 
   render() {
-    if (!this.state.items_data) { return null; }
+    let items_data = this.props.items_data;
+    if (!items_data) { return null; }
 
     var items = [];
-    this.state.items_data.map((item, i) =>
+    items_data.map((item, i) =>
       items.push(
         <Link key={i} className="title" to={{ pathname: `/item/${item.id}` }}>
           <div className={`feed-item seen_${item.seen}`}>
@@ -49,9 +43,7 @@ class ItemList extends Component {
       <div id="feed-items">
         <InfiniteScroll
           pageStart={0}
-          loadMore={() => {
-            console.log("f")
-          }}
+          loadMore={this.props.load_more_handler}
           hasMore={true}
           initialLoad={false}
           useWindow={false}

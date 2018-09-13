@@ -5,7 +5,7 @@ import Main from './Main'
 import Login from './Login'
 import store from './store'
 
-import '../styles/App.css';
+import '../styles/App.scss';
 
 const PrivateRoute = ({ component: Component, ...rest }) => (
   <Route

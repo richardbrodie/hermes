@@ -1,6 +1,6 @@
 use chrono::{DateTime, Utc};
 use futures::stream::SplitSink;
-use futures::{Future, Stream};
+use futures::{Future, Sink, Stream};
 use jsonwebtoken::errors::ErrorKind;
 use jsonwebtoken::{decode, encode, Header, Validation};
 use regex::Regex;
@@ -20,7 +20,7 @@ use warp::{self, Filter, Rejection};
 
 use db::{self, get_subscribed_feeds, get_subscribed_item, get_subscribed_items};
 use feed;
-use models::{Claims, User};
+use models::{Claims, CompositeItem, FeedMessage, Item, NewFeed, NewItem, User};
 
 static ASSET_PATH: &'static str = "./ui/dist/static";
 
@@ -165,42 +165,50 @@ fn ws_created(
   users: UserWebsocketState,
 ) -> impl Future<Item = (), Error = ()> {
   let user_id = claims.id;
-  // info!("user connected: {} - {}", user_id, claims.name);
+  debug!("WS: user connected: {} - {}", user_id, claims.name);
   let (tx, rx) = ws.split();
   users.insert(user_id, tx);
   let users2 = users.clone();
 
   rx.for_each(move |msg| {
-    user_incoming_msg(user_id, msg, &users);
+    ws_incoming_msg(user_id, msg, &users);
     Ok(())
   }).then(move |result| {
-      user_disconnected(&user_id, &users2);
-      result
-    })
-    .map_err(move |e| {
-      info!("websocket error(uid={}): {}", &user_id, e);
-    })
+    ws_user_disconnected(&user_id, &users2);
+    result
+  }).map_err(move |e| {
+    error!("WS: connect error uid={}: {}", &user_id, e);
+  })
 }
 
-fn user_incoming_msg(user_id: i32, msg: Message, users: &UserWebsocketState) {
+fn ws_incoming_msg(user_id: i32, msg: Message, users: &UserWebsocketState) {
   match serde_json::from_str::<UserMessage>(msg.to_str().unwrap()) {
     Ok(message) => match message.msg_type {
       UserMessageType::MarkRead => {
-        info!("user {} read item {}", user_id, message.data);
+        debug!("WS: user {} read item {}", user_id, message.data);
         db::mark_subscribed_item_as_read(message.data.parse::<i32>().unwrap());
       }
       UserMessageType::Subscribe => {
-        debug!("user {} subscribed to {}", user_id, message.data);
+        debug!("WS: user {} subscribed to {}", user_id, message.data);
         feed::subscribe_feed(message.data, user_id, users.to_owned());
       }
     },
-    Err(_) => error!("Could not parse {:?} as a UserMessage", msg),
+    Err(_) => error!("WS: eculd not parse {:?} as a UserMessage", msg),
   };
 }
 
-fn user_disconnected(user_id: &i32, users: &UserWebsocketState) {
-  // info!("good bye user: {}", user_id);
+fn ws_user_disconnected(user_id: &i32, users: &UserWebsocketState) {
+  debug!("WS: user {} disconnected", user_id);
   users.remove(user_id);
+}
+
+pub fn ws_send_message(user_id: &i32, message: FeedMessage, state: &UserWebsocketState) {
+  match state.state.lock().unwrap().get_mut(user_id) {
+    Some(mut tx) => {
+      let _ = tx.start_send(message.to_message());
+    }
+    None => (),
+  };
 }
 
 fn show_feeds(claims: Claims) -> Result<impl warp::Reply, warp::Rejection> {
@@ -259,8 +267,7 @@ fn serve_static(asset: AssetFile) -> impl Future<Item = Response<Body>, Error = 
       let buf: Vec<u8> = Vec::new();
       tokio_io::io::read_to_end(file, buf)
         .and_then(|(_, b)| Ok(Response::builder().body(Body::from(b)).unwrap()))
-    })
-    .or_else(|e| {
+    }).or_else(|e| {
       error!("file open error: {} ", e);
       let err = match e.kind() {
         io::ErrorKind::NotFound => warp::reject::not_found().with(e),
@@ -272,13 +279,6 @@ fn serve_static(asset: AssetFile) -> impl Future<Item = Response<Body>, Error = 
 
 fn decode_jwt(token: String) -> Result<Claims, StatusCode> {
   let secret = env::var("JWT_SECRET").unwrap();
-
-  // let r = r"^Bearer\s([\w_-]+\.[\w_-]+\.[\w=_-]+)$";
-  // let regex = Regex::new(&r).unwrap();
-  // let t = match regex.captures(&token) {
-  //   Some(d) => d.get(1).unwrap().as_str(),
-  //   None => return Err(StatusCode::UNAUTHORIZED),
-  // };
   let t = token;
 
   let validation = Validation {

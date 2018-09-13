@@ -28,6 +28,7 @@ export default class Main extends Component {
     this.send_add_new_feed_handler = this.send_add_new_feed_handler.bind(this)
     this.mark_item_as_read = this.mark_item_as_read.bind(this)
     this.select_item_handler = this.select_item_handler.bind(this)
+    this.load_more_handler = this.load_more_handler.bind(this)
   }
 
   render() {
@@ -37,7 +38,7 @@ export default class Main extends Component {
 
         <Switch>
           <Route path="/feed/:id"
-            render={(props) => <ItemList {...props} handler={this.select_feed_handler} items_data={this.state.items_data} last_date={this.state.last_date} />} />
+            render={(props) => <ItemList {...props} handler={this.select_feed_handler} items_data={this.state.items_data} load_more_handler={this.load_more_handler} />} />
           <Route path="/add" render={(props) => <AddFeed {...props} handler={this.send_add_new_feed_handler} />} />
           <Route path="/item/:id" render={(props) => <SingleItem {...props} handler={this.select_item_handler} item={this.state.selected_item} />} />
         </Switch>
@@ -119,8 +120,9 @@ export default class Main extends Component {
 
   // callback handlers
   select_feed_handler(id) {
-    this.setState({ items_data: [], selected_feed_id: id, last_date: null })
-    this.fetch_items(id)
+    this.setState({ items_data: [], selected_feed_id: id, last_date: null }, function () {
+      this.fetch_items(id)
+    })
   }
   load_more_handler() {
     this.fetch_items(this.state.selected_feed_id)

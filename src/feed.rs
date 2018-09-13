@@ -20,7 +20,7 @@ use db::{
   insert_subscribed_items, update_item,
 };
 use models::{CompositeItem, FeedMessage, Item, NewFeed, NewItem};
-use web::UserWebsocketState;
+use web::{ws_send_message, UserWebsocketState};
 
 enum FeedType {
   RSS(rss::Channel),
@@ -46,7 +46,7 @@ pub fn start_interval_loops(global_user_state: UserWebsocketState) {
             match new_items {
               Some(items) => {
                 debug!("found {} new items for {}", items.len(), &feed_id);
-                send_ws_message(feed_id, items, &sid, &local_state);
+                send_items(feed_id, items, &sid, &local_state);
               }
               None => (),
             };
@@ -56,35 +56,8 @@ pub fn start_interval_loops(global_user_state: UserWebsocketState) {
         },
       );
       Ok(())
-    })
-    .map_err(|e| panic!("delay errored; err={:?}", e));
+    }).map_err(|e| panic!("delay errored; err={:?}", e));
   rt::spawn(update_subscriptions);
-}
-
-fn send_ws_message(
-  feed_id: i32,
-  new_items: Vec<Item>,
-  subscriber_ids: &Vec<i32>,
-  state: &UserWebsocketState,
-) {
-  let composites: Vec<_> = new_items
-    .into_iter()
-    .map(|item| CompositeItem::from_item(&item))
-    .collect();
-  for uid in subscriber_ids.iter() {
-    let feed = db::get_subscribed_feed(uid, &feed_id);
-    let msg = FeedMessage::new(feed.unwrap(), Some(&composites));
-    send_info_as_json(&uid, msg, state);
-  }
-}
-
-fn send_info_as_json(user_id: &i32, message: FeedMessage, state: &UserWebsocketState) {
-  match state.state.lock().unwrap().get_mut(user_id) {
-    Some(mut tx) => {
-      let _ = tx.start_send(message.to_message());
-    }
-    None => (),
-  };
 }
 
 pub fn subscribe_feed(url: String, user_id: i32, state: UserWebsocketState) {
@@ -94,32 +67,21 @@ pub fn subscribe_feed(url: String, user_id: i32, state: UserWebsocketState) {
     .and_then(|feed_id| {
       debug!("in db: '{}'", feed_id);
       Ok((feed_id, db::get_item_ids(&feed_id)))
-    })
-    .or_else(|_| {
+    }).or_else(|_| {
       debug!("not in db: '{}'", url);
       add_feed(url)
-    })
-    .and_then(move |(feed_id, item_ids)| {
+    }).and_then(move |(feed_id, item_ids)| {
       db::subscribe_feed(&user_id, &feed_id);
       Ok((feed_id, item_ids))
-    })
-    .and_then(move |(feed_id, item_ids)| {
+    }).and_then(move |(feed_id, item_ids)| {
       match item_ids {
         Some(item_ids) => subscribe_new_items(&item_ids, &vec![user_id]),
         None => (),
       };
       Ok((feed_id, state))
-    })
-    .and_then(move |(feed_id, state)| {
-      let feed = db::get_subscribed_feed(&user_id, &feed_id);
-      let items = db::get_subscribed_items(feed_id, user_id, None);
-      let composites: Vec<_> = items
-        .unwrap()
-        .into_iter()
-        .map(|item| CompositeItem::from_subscribed(&item))
-        .collect();
-      let msg = FeedMessage::new(feed.unwrap(), Some(&composites));
-      Ok(send_info_as_json(&user_id, msg, &state))
+    }).and_then(move |(feed_id, state)| {
+      send_subscribeditems(feed_id, user_id, &state);
+      Ok(())
     });
   rt::spawn(work);
 }
@@ -131,8 +93,7 @@ pub fn add_feed(url: String) -> impl Future<Item = (i32, Option<Vec<i32>>), Erro
     .and_then(|(new_feed, new_items)| {
       let new_ch = insert_channel(new_feed);
       Ok((new_items, new_ch.id))
-    })
-    .and_then(|(items, feed_id)| Ok((feed_id, handle_item_types(items, &feed_id))))
+    }).and_then(|(items, feed_id)| Ok((feed_id, handle_item_types(items, &feed_id))))
     .and_then(|(feed_id, items)| {
       let items = insert_items(&items).unwrap();
       let item_ids: Vec<_> = items.into_iter().map(|i| i.id).collect();
@@ -160,6 +121,35 @@ pub fn update_feed(
       }
       None => Ok(None),
     })
+}
+
+fn send_items(
+  feed_id: i32,
+  new_items: Vec<Item>,
+  subscriber_ids: &Vec<i32>,
+  state: &UserWebsocketState,
+) {
+  let composites: Vec<_> = new_items
+    .into_iter()
+    .map(|item| CompositeItem::from_item(&item))
+    .collect();
+  for uid in subscriber_ids.iter() {
+    let feed = db::get_subscribed_feed(uid, &feed_id);
+    let msg = FeedMessage::new(feed.unwrap(), Some(&composites));
+    ws_send_message(&uid, msg, state);
+  }
+}
+
+fn send_subscribeditems(feed_id: i32, user_id: i32, state: &UserWebsocketState) {
+  let feed = db::get_subscribed_feed(&user_id, &feed_id);
+  let items = db::get_subscribed_items(feed_id, user_id, None);
+  let composites: Vec<_> = items
+    .unwrap()
+    .into_iter()
+    .map(|item| CompositeItem::from_subscribed(&item))
+    .collect();
+  let msg = FeedMessage::new(feed.unwrap(), Some(&composites));
+  ws_send_message(&user_id, msg, &state);
 }
 
 /////////////////////////
@@ -247,8 +237,7 @@ fn subscribe_new_items(inserted_items: &Vec<i32>, subscribers: &Vec<i32>) {
         .iter()
         .map(move |i| (s, i, false))
         .collect::<Vec<(&i32, &i32, bool)>>()
-    })
-    .collect::<Vec<(&i32, &i32, bool)>>();
+    }).collect::<Vec<(&i32, &i32, bool)>>();
   insert_subscribed_items(insertables);
 }
 
@@ -287,8 +276,7 @@ fn process_duplicates(items: Vec<NewItem>) -> Option<Vec<NewItem>> {
           } else {
             None
           }
-        })
-        .collect();
+        }).collect();
       debug!("found {} updated items", updated_items.len());
       updated_items
         .into_iter()
