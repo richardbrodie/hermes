@@ -3,12 +3,6 @@
   "version": "1.0.0",
   "license": "MIT",
   "dependencies": {
-    "@fortawesome/fontawesome-free": "^5.3.1",
-    "@fortawesome/fontawesome-svg-core": "^1.2.4",
-    "@fortawesome/free-solid-svg-icons": "^5.3.1",
-    "@fortawesome/react-fontawesome": "^0.1.3",
-    "babel-plugin-styled-components": "^1.7.1",
-    "bulma": "^0.7.1",
     "jwt-decode": "^2.2.0",
     "mobx": "^5.1.1",
     "react": "^16.5.1",
@@ -16,20 +10,32 @@
     "react-infinite-scroller": "^1.2.1",
     "react-router-dom": "^4.3.1",
     "react-timeago": "^4.1.9",
-    "sass": "^1.13.4",
-    "sockette": "^2.0.0",
-    "styled-components": "^3.4.6"
+    "sockette": "^2.0.0"
   },
   "devDependencies": {
+    "@babel/core": "^7.0.1",
+    "@babel/preset-env": "^7.0.0",
+    "@babel/preset-react": "^7.0.0",
+    "babel-loader": "^8.0.2",
+    "babel-plugin-styled-components": "^1.7.1",
     "babel-plugin-transform-object-rest-spread": "^6.26.0",
-    "babel-preset-env": "^1.7.0",
-    "babel-preset-react": "^6.24.1",
+    "css-loader": "^1.0.0",
+    "extract-text-webpack-plugin": "^3.0.2",
+    "file-loader": "^2.0.0",
+    "html-loader": "^0.5.5",
+    "html-webpack-plugin": "^3.2.0",
+    "image-webpack-loader": "^4.3.1",
     "node-sass": "^4.9.3",
-    "parcel-bundler": "^1.9.7"
+    "sass": "^1.13.4",
+    "sass-loader": "^7.1.0",
+    "style-loader": "^0.23.0",
+    "styled-components": "^3.4.6",
+    "webpack": "^4.19.0",
+    "webpack-cli": "^3.1.0"
   },
   "scripts": {
-    "serve": "parcel serve ./src/index.html",
-    "watch": "parcel watch ./src/index.html -d dist/static",
-    "build": "parcel build ./src/index.html/ -d dist/static"
+    "watch": "webpack --mode development --watch",
+    "build": "webpack --mode production",
+    "start": "webpack --mode development"
   }
 }

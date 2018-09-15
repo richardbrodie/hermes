@@ -1,5 +1,6 @@
 import React, { Component } from 'react';
 import { Route, Switch } from 'react-router-dom';
+import styled from 'styled-components';
 import Sockette from 'sockette';
 
 import AddFeed from './AddFeed'
@@ -9,6 +10,13 @@ import Sidebar from './Sidebar'
 import store from './store';
 
 import "../styles/Main.css"
+
+const MainView = styled.div`
+  display: grid;
+  grid-template-columns: 230px 1fr;
+  grid-template-rows: 6vh auto;
+  height: 99vh;
+`;
 
 export default class Main extends Component {
   constructor(props) {
@@ -33,7 +41,7 @@ export default class Main extends Component {
 
   render() {
     return (
-      <div id="main-view">
+      <MainView>
         <Sidebar feeds_data={this.state.feeds_data} />
 
         <Switch>
@@ -42,7 +50,7 @@ export default class Main extends Component {
           <Route path="/add" render={(props) => <AddFeed {...props} handler={this.send_add_new_feed_handler} />} />
           <Route path="/item/:id" render={(props) => <SingleItem {...props} handler={this.select_item_handler} item={this.state.selected_item} />} />
         </Switch>
-      </div>
+      </MainView>
     )
   }
 

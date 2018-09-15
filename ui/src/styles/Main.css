@@ -1,16 +1,5 @@
-#main-view {
-  display: grid;
-  grid-template-columns: 210px 1fr;
-  grid-template-rows: 6vh auto;
-  height: 99vh;
-}
-
 a {
   color: black;
   text-decoration: none;
   outline: 0;
-}
-
-#add-feed {
-  padding-left: 0.5em;
 }

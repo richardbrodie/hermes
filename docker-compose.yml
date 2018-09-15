@@ -13,7 +13,6 @@ services:
       - DB_HOST=db
       - ADMIN_PASS=admin
       - JWT_SECRET=8jh676FU598hlQ
-      # - RUST_BACKTRACE=1
   db:
     image: postgres:10
     ports:

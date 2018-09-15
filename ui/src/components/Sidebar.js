@@ -26,6 +26,15 @@ const StyledFeedList = styled.nav`
   grid-row: 2;
   grid-column: 1;
   font-size: 10pt;
+  .active {
+    font-weight: 600;
+  }
+`;
+
+const AddFeedButton = styled.div`
+  margin-left: auto;
+  margin-right: auto;
+  margin-top: auto;
 `;
 
 class Sidebar extends Component {
@@ -46,10 +55,9 @@ class Sidebar extends Component {
             </NavLink>
           ))}
         </StyledFeedList>
-        <div className="btnCtr">
+        <AddFeedButton>
           <Link className="menuItem" to="/add"> Add feed </Link>
-          <Link className="menuItem" to="/add"> Settings </Link>
-        </div>
+        </AddFeedButton>
       </StyledSidebar>
     )
   }

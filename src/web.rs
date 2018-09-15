@@ -75,7 +75,8 @@ struct AssetFile(String);
 impl FromStr for AssetFile {
   type Err = Rejection;
   fn from_str(s: &str) -> Result<AssetFile, Rejection> {
-    let re = Regex::new(r"((?:src|favicon)\.\w+\.(?:css|js|png))").unwrap();
+    // let re = Regex::new(r"((?:src|favicon)\.\w+\.(?:css|js|png))").unwrap();
+    let re = Regex::new(r"((?:main|favicon).(?:css|js|png))").unwrap();
     match re.captures(&s) {
       Some(m) => Ok(AssetFile(m.get(1).unwrap().as_str().to_owned())),
       None => Err(warp::reject::not_found()),
