@@ -18,9 +18,9 @@ RUN cargo install diesel_cli --no-default-features --features postgres
 RUN USER=root cargo new --bin app
 WORKDIR /app
 
-COPY ./react-ui ./react-ui
-RUN cd react-ui && yarn install
-RUN cd react-ui && yarn build
+COPY ./ui ./ui
+RUN cd ui && yarn install
+RUN cd ui && yarn build
 
 COPY ./Cargo.lock ./Cargo.lock
 COPY ./Cargo.toml ./Cargo.toml
@@ -32,11 +32,11 @@ FROM debian:stretch-slim
 RUN apt update && apt install -y libssl-dev openssl libpq5 netcat-openbsd ca-certificates
 
 WORKDIR /app
-RUN mkdir ./react-ui
-RUN mkdir ./react-ui/build
+RUN mkdir ./ui
+RUN mkdir ./ui/dist
 COPY --from=build app/target/release/hermes .
 COPY --from=build app/target/release/add_user .
-COPY --from=build app/react-ui/build ./react-ui/build
+COPY --from=build app/ui/dist ./ui/dist
 COPY --from=build /usr/local/cargo/bin/diesel /usr/bin/diesel
 
 COPY ./Cargo.toml ./Cargo.toml

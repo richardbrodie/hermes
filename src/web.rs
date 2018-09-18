@@ -157,7 +157,7 @@ pub fn start_web(state: UserWebsocketState) {
   // let api = api_feeds.or(api_items).or(api_item).or(api_add_feed);
   let api = api_feeds.or(api_items).or(api_item);
   let routes = authenticate.or(api).or(assets).or(ws).or(star);
-  warp::serve(routes).run(([127, 0, 0, 1], 3030));
+  warp::serve(routes).run(([0, 0, 0, 0], 3030));
 }
 
 fn ws_created(

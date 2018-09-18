@@ -2,8 +2,6 @@ import React, { Component } from "react"
 import { NavLink, Link } from "react-router-dom"
 import styled from 'styled-components';
 
-import "../styles/Sidebar.css"
-
 const StyledSidebar = styled.div`
   border-right: 1px solid #0a0a0a;
   background-color:#EDEDED;
@@ -37,6 +35,38 @@ const AddFeedButton = styled.div`
   margin-top: auto;
 `;
 
+const FeedLink = styled.div`
+  padding: 10px 10px;
+  border-bottom: 1px solid #d1cfcf;
+  display: flex;
+  &:hover {
+    background: rgb(255, 255, 255);
+  }
+`;
+
+const FeedCount = styled.span`
+  margin-left: auto;
+  margin-top: auto;
+  margin-bottom: auto;
+  font-weight: 400;
+  border: 1px solid;
+  border-radius: 7px;
+  background: #2cadee;
+  color: white;
+  padding: 0 8px;
+`;
+
+const MenuLink = styled(Link)`
+  text-transform: uppercase;
+  cursor: pointer;
+  text-align: center;
+  padding-left: 10px;
+  padding-right: 10px;
+  &:hover {
+    background: rgb(255, 255, 255);
+  }
+`;
+
 class Sidebar extends Component {
   render() {
     const feeds = this.props.feeds_data
@@ -48,15 +78,15 @@ class Sidebar extends Component {
         <StyledFeedList>
           {feeds.map((feed, i) => (
             <NavLink key={i} to={`/feed/${feed.id}`}>
-              <div data_id={feed.id} className="router-link" key={i}>
+              <FeedLink data_id={feed.id} key={i}>
                 <span className="feed-title">{feed.title}</span>
-                <span className="feed-count">{feed.unseen_count}</span>
-              </div>
+                <FeedCount>{feed.unseen_count}</FeedCount>
+              </FeedLink>
             </NavLink>
           ))}
         </StyledFeedList>
         <AddFeedButton>
-          <Link className="menuItem" to="/add"> Add feed </Link>
+          <MenuLink to="/add"> Add feed </MenuLink>
         </AddFeedButton>
       </StyledSidebar>
     )
