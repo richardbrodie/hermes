@@ -1,19 +1,16 @@
 use atom_syndication;
 use futures::future::IntoFuture;
-use futures::{stream, Sink};
 use hyper::rt::{self, Future, Stream};
 use hyper::{Body, Client};
 use hyper_tls::HttpsConnector;
 use quick_xml::events::Event;
 use quick_xml::Reader;
 use rss;
-use serde_json;
 use std::io::BufReader;
 use std::option::Option;
 use std::str;
 use std::time::{Duration, Instant};
 use tokio::timer::Interval;
-use warp::ws::{Message, WebSocket};
 
 use db::{
   self, find_duplicates, get_channel_urls_and_subscribers, insert_channel, insert_items,
@@ -36,7 +33,7 @@ enum ItemType {
 ////////////////////////
 
 pub fn start_interval_loops(global_user_state: UserWebsocketState) {
-  let update_subscriptions = Interval::new(Instant::now(), Duration::from_secs(30))
+  let update_subscriptions = Interval::new(Instant::now(), Duration::from_secs(300))
     .for_each(move |_| {
       get_channel_urls_and_subscribers().into_iter().for_each(
         |(feed_id, feed_url, subscriber_ids)| {

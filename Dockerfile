@@ -43,4 +43,6 @@ COPY ./Cargo.toml ./Cargo.toml
 COPY ./Cargo.lock ./Cargo.lock
 COPY ./migrations ./migrations
 COPY ./docker-entrypoint.sh ./docker-entrypoint.sh
+
+EXPOSE 3030
 ENTRYPOINT ["./docker-entrypoint.sh"]

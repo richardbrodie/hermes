@@ -20,7 +20,7 @@ use warp::{self, Filter, Rejection};
 
 use db::{self, get_subscribed_feeds, get_subscribed_item, get_subscribed_items};
 use feed;
-use models::{Claims, CompositeItem, FeedMessage, Item, NewFeed, NewItem, User};
+use models::{Claims, FeedMessage, User};
 
 static ASSET_PATH: &'static str = "./ui/dist/static";
 
@@ -205,7 +205,7 @@ fn ws_user_disconnected(user_id: &i32, users: &UserWebsocketState) {
 
 pub fn ws_send_message(user_id: &i32, message: FeedMessage, state: &UserWebsocketState) {
   match state.state.lock().unwrap().get_mut(user_id) {
-    Some(mut tx) => {
+    Some(tx) => {
       let _ = tx.start_send(message.to_message());
     }
     None => (),
@@ -214,7 +214,7 @@ pub fn ws_send_message(user_id: &i32, message: FeedMessage, state: &UserWebsocke
 
 fn show_feeds(claims: Claims) -> Result<impl warp::Reply, warp::Rejection> {
   match get_subscribed_feeds(&claims.id) {
-    Some(mut feeds) => Ok(warp::reply::json(&feeds)),
+    Some(feeds) => Ok(warp::reply::json(&feeds)),
     None => Err(warp::reject::not_found()),
   }
 }

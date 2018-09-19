@@ -2,10 +2,11 @@ version: "3.6"
 services:
   hermes:
     build: .
+    # image: richardbrodie/hermes
     depends_on:
       - db
     ports:
-      - "3030:80"
+      - 3030:3030
     environment:
       - PG_USER=feeds
       - PG_PASS=feeds123
