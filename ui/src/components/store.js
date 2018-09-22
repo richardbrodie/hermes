@@ -1,4 +1,4 @@
-import { observable, computed } from 'mobx'
+import { observable } from 'mobx'
 import JwtDecode from 'jwt-decode';
 
 const store = observable({

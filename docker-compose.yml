@@ -2,7 +2,6 @@ version: "3.6"
 services:
   hermes:
     build: .
-    # image: richardbrodie/hermes
     depends_on:
       - db
     ports:

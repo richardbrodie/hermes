@@ -1,11 +1,6 @@
 import React, { Component } from 'react';
-import styled from 'styled-components';
-
 import store from './store';
-
-const StyledAddFeed = styled.div`
-  padding-left: 0.5em;
-`;
+import styled from 'styled-components';
 
 class AddFeed extends Component {
   constructor(props) {
@@ -63,5 +58,9 @@ class AddFeed extends Component {
     );
   }
 }
+
+export const StyledAddFeed = styled.div`
+  padding-left: 0.5em;
+`;
 
 export default AddFeed;

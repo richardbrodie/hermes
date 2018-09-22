@@ -1,9 +1,8 @@
 import React, { Component } from 'react';
-import { Link } from 'react-router-dom';
-import TimeAgo from 'react-timeago';
 import InfiniteScroll from 'react-infinite-scroller';
+import styled from 'styled-components';
 
-import '../styles/ItemList.css';
+import { ItemListItem } from './ItemListItem';
 
 class ItemList extends Component {
   constructor(props) {
@@ -28,19 +27,11 @@ class ItemList extends Component {
 
     var items = [];
     items_data.map((item, i) =>
-      items.push(
-        <Link key={i} className="title" to={{ pathname: `/item/${item.id}` }}>
-          <div className={`feed-item seen_${item.seen}`}>
-            <span>{item.title}</span>
-            <span className='desc meta'>{item.summary}</span>
-            <TimeAgo className='pub_date meta' date={item.published_at} minPeriod='30' />
-          </div >
-        </Link>
-      )
+      items.push(<ItemListItem key={i} item={item} />)
     );
 
     return (
-      <div id="feed-items">
+      <FeedItems>
         <InfiniteScroll
           pageStart={0}
           loadMore={this.props.load_more_handler}
@@ -50,9 +41,15 @@ class ItemList extends Component {
         >
           {items}
         </InfiniteScroll>
-      </div >
+      </FeedItems>
     );
   }
 }
+
+const FeedItems = styled.div`
+  grid-row: 1 / span 2;
+  grid-column: 2;
+  overflow-y: scroll;
+`;
 
 export default ItemList;

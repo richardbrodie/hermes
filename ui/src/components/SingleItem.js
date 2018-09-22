@@ -1,13 +1,7 @@
-import React, { PureComponent, Component } from "react"
-import TimeAgo from "react-timeago"
+import React, { PureComponent } from "react"
 import styled from 'styled-components';
 
-const StyledItem = styled.div`
-  padding-left: 10px;
-  grid-row: 1 / span 2;
-  grid-column: 2;
-  overflow-y: scroll;
-`;
+import { StyledTime } from './ItemListItem';
 
 class SingleItem extends PureComponent {
   constructor(props) {
@@ -26,11 +20,7 @@ class SingleItem extends PureComponent {
           <a href={item.link}>{item.title}</a>
         </h1>
         <h3>
-          <TimeAgo
-            className="pub_date"
-            date={item.published_at}
-            minPeriod="30"
-          />
+          <StyledTime date={item.published_at} minPeriod="30" />
         </h3>
         <p>{item.summary}</p>
         <p dangerouslySetInnerHTML={{ __html: item.content }} />
@@ -38,5 +28,12 @@ class SingleItem extends PureComponent {
     )
   }
 }
+
+const StyledItem = styled.div`
+  padding-left: 10px;
+  grid-row: 1 / span 2;
+  grid-column: 2;
+  overflow-y: scroll;
+`;
 
 export default SingleItem

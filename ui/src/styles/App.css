@@ -1,7 +1,7 @@
 html {
   text-rendering: optimizeLegibility;
   font-family: "Open Sans", sans-serif;
-  font-feature-settings: "dlig", "liga", "lnum", "kern";
+  font-feature-settings: "lnum", "kern";
   line-height: 1.5em;
 }
 body {

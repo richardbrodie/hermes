@@ -9,13 +9,19 @@ import SingleItem from './SingleItem'
 import Sidebar from './Sidebar'
 import store from './store';
 
-import "../styles/Main.css"
-
+const styled_a = `
+  a {
+    color: black;
+    text-decoration: none;
+    outline: 0;
+  }
+`;
 const MainView = styled.div`
-  display: grid;
-  grid-template-columns: 230px 1fr;
-  grid-template-rows: 6vh auto;
+  ${ styled_a}
   height: 99vh;
+  display: grid;
+  grid-template-rows: 6vh auto;
+  grid-template-columns: 230px 1fr;
 `;
 
 export default class Main extends Component {
