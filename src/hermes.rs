@@ -31,9 +31,36 @@ extern crate tokio_io;
 extern crate url;
 extern crate warp;
 
+use dotenv::dotenv;
+use hyper::rt;
+use std::collections::HashMap;
+use std::env;
+use std::sync::{Arc, Mutex};
+
 pub mod db;
 pub mod feed;
 pub mod models;
 pub mod schema;
 pub mod views;
 pub mod web;
+
+use db::create_admin_user;
+use feed::start_interval_loops;
+use web::{start_web, UserWebsocketState};
+
+fn main() {
+  dotenv().ok();
+  env::set_var("RUST_LOG", "hermes=info");
+  pretty_env_logger::init();
+
+  create_admin_user();
+
+  rt::run(rt::lazy(|| {
+    let state = Arc::new(Mutex::new(HashMap::new()));
+    let global_user_state = UserWebsocketState { state: state };
+
+    start_interval_loops(global_user_state.clone());
+    start_web(global_user_state.clone());
+    Ok(())
+  }));
+}

@@ -33,14 +33,6 @@ tokio-io = "0.1"
 url = "1.7.0"
 warp = ""
 
-[lib]
-name = "hermes_lib"
-path = "src/lib.rs"
-
 [[bin]]
 name = "hermes"
-path = "src/bin.rs"
-
-[[bin]]
-name = "add_user"
-path = "src/bin/add_user.rs"
+path = "src/hermes.rs"
