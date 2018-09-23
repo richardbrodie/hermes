@@ -3,7 +3,7 @@ import { Route, Switch, Redirect } from 'react-router-dom';
 
 import Main from './Main'
 import Login from './Login'
-import store from './store'
+import * as store from './local_storage'
 
 import '../styles/App.css'
 
@@ -11,7 +11,7 @@ const PrivateRoute = ({ component: Component, ...rest }) => (
   <Route
     {...rest}
     render={props =>
-      store.loggedIn ? (
+      store.logged_in() ? (
         <Component {...props} />
       ) : (
           <Redirect
@@ -28,8 +28,6 @@ const PrivateRoute = ({ component: Component, ...rest }) => (
 class App extends Component {
   constructor(props) {
     super(props)
-    const token = localStorage.getItem('token');
-    token ? store.setToken(token) : store.removeToken()
   }
 
 

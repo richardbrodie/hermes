@@ -7,7 +7,8 @@ import AddFeed from './AddFeed'
 import ItemList from './ItemList'
 import SingleItem from './SingleItem'
 import Sidebar from './Sidebar'
-import store from './store';
+import Settings from './Settings'
+import * as store from './local_storage';
 
 const styled_a = `
   a {
@@ -54,6 +55,7 @@ export default class Main extends Component {
           <Route path="/feed/:id"
             render={(props) => <ItemList {...props} handler={this.select_feed_handler} items_data={this.state.items_data} load_more_handler={this.load_more_handler} />} />
           <Route path="/add" render={(props) => <AddFeed {...props} handler={this.send_add_new_feed_handler} />} />
+          <Route path="/settings" render={(props) => <Settings {...props} />} />
           <Route path="/item/:id" render={(props) => <SingleItem {...props} handler={this.select_item_handler} item={this.state.selected_item} />} />
         </Switch>
       </MainView>
@@ -62,7 +64,7 @@ export default class Main extends Component {
 
   // websockets
   setup_socket() {
-    const url = `ws://${window.location.host}/ws?access_token=${store.currentJWT}`;
+    const url = `ws://${window.location.host}/ws${store.access_token_str()}`;
     return new Sockette(url, {
       maxAttempts: 10,
       onmessage: e => {
@@ -82,18 +84,18 @@ export default class Main extends Component {
 
   // REST
   fetch_feeds() {
-    var url = `/api/feeds${store.accessToken}`;
+    var url = `/api/feeds${store.access_token_str()}`;
     var req = make_req(url, 'GET');
     fetch(req)
       .then(resp => resp.json())
       .then(data => {
         if (data) { this.setState({ feeds_data: data }) }
       })
-      .catch(error => store.msgCallback('error', error, 'warning'));
+      .catch(error => console.log("fetch feeds error: ", error));
   }
 
   fetch_items(id) {
-    var url = `/api/items/${id}${store.accessToken}`;
+    var url = `/api/items/${id}${store.access_token_str()}`;
     if (this.state.last_date) {
       url = `${url}&updated=${this.state.last_date}`;
     }
@@ -116,11 +118,11 @@ export default class Main extends Component {
           }
         }
       })
-      .catch(error => store.msgCallback('error', error, 'warning'));
+      .catch(error => console.log("fetch items error: ", error));
   }
 
   fetch_item(id) {
-    var url = `/api/item/${id}${store.accessToken}`;
+    var url = `/api/item/${id}${store.access_token_str()}`;
     var req = make_req(url, 'GET');
     fetch(req)
       .then(resp => resp.json())
@@ -129,7 +131,7 @@ export default class Main extends Component {
           this.setState({ selected_item: data, selected_item_id: id });
         }
       })
-      .catch(error => store.msgCallback('error', error, 'warning'));
+      .catch(error => console.log("fetch item error: ", error));
   }
 
   // callback handlers

@@ -21,6 +21,7 @@ class Sidebar extends Component {
         </StyledFeedList>
         <AddFeedButton>
           <MenuLink to="/add"> Add feed </MenuLink>
+          <MenuLink to="/settings"> Settings </MenuLink>
         </AddFeedButton>
       </StyledSidebar>
     )
