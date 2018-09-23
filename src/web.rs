@@ -39,9 +39,12 @@ impl UserWebsocketState {
   pub fn remove(&self, key: &i32) {
     self.state.lock().unwrap().remove(key);
   }
-  // pub fn prep(&self) -> () {
-  //   self.state.lock().unwrap();
-  // }
+}
+
+#[derive(Deserialize, Debug)]
+struct Settings {
+  name: String,
+  data: HashMap<String, String>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -49,18 +52,15 @@ struct Login {
   username: String,
   password: String,
 }
-
 #[derive(Deserialize, Debug)]
 struct AddFeed {
   feed_url: String,
 }
-
 #[derive(Deserialize, Debug)]
 enum UserMessageType {
   MarkRead,
   Subscribe,
 }
-
 #[derive(Deserialize, Debug)]
 struct UserMessage {
   msg_type: UserMessageType,
@@ -128,15 +128,22 @@ pub fn start_web(state: UserWebsocketState) {
     .and(jwt_auth)
     .and_then(|item_id, claims| show_item(claims, item_id));
   // /api/add_feed
-  // let api_add_feed = warp::post2()
-  //   .and(warp::path("api"))
-  //   .and(warp::path("add_feed"))
-  //   .and(jwt_auth)
-  //   .and(warp::body::json())
-  //   .map(move |claims: Claims, payload: AddFeed| {
-  //     feed::subscribe_feed(payload.feed_url, claims.id, state.clone());
-  //     warp::reply()
-  //   });
+  let api_add_feed = warp::post2()
+    .and(warp::path("api"))
+    .and(warp::path("add_feed"))
+    .and(jwt_auth)
+    .and(warp::body::json())
+    .map(move |claims: Claims, payload: AddFeed| {
+      feed::subscribe_feed(payload.feed_url, claims.id, state.clone());
+      warp::reply()
+    });
+  // /api/add_user
+  let api_add_user = warp::post2()
+    .and(warp::path("api"))
+    .and(warp::path("add_feed"))
+    .and(jwt_auth)
+    .and(warp::body::json())
+    .and_then(move |claims: Claims, payload: Login| add_user(&payload, &claims));
   // /api/items/:feed_id
   let api_items = warp::get2()
     .and(warp::path("api"))
@@ -145,6 +152,13 @@ pub fn start_web(state: UserWebsocketState) {
     .and(warp::query::<HashMap<String, String>>())
     .and(jwt_auth)
     .and_then(|feed_id, query: HashMap<String, String>, claims| show_items(claims, feed_id, query));
+  // /api/settings
+  let api_settings = warp::post2()
+    .and(warp::path("api"))
+    .and(warp::path("settings"))
+    .and(warp::body::json())
+    .and(jwt_auth)
+    .and_then(|payload: Settings, claims: Claims| change_settings(&payload, &claims));
 
   let ws = warp::path("ws")
     .and(warp::ws2())
@@ -154,11 +168,41 @@ pub fn start_web(state: UserWebsocketState) {
       ws.on_upgrade(|websocket| ws_created(websocket, claims, state))
     });
 
-  // let api = api_feeds.or(api_items).or(api_item).or(api_add_feed);
-  let api = api_feeds.or(api_items).or(api_item);
+  let api = api_feeds
+    .or(api_items)
+    .or(api_item)
+    .or(api_add_feed)
+    .or(api_add_user)
+    .or(api_settings);
   let routes = authenticate.or(api).or(assets).or(ws).or(star);
   warp::serve(routes).run(([0, 0, 0, 0], 3030));
 }
+
+fn change_settings(
+  settings: &Settings,
+  claims: &Claims,
+) -> Result<impl warp::Reply, warp::Rejection> {
+  info!("settings: {:?}", settings);
+  Ok(warp::reply())
+}
+
+fn add_user(login: &Login, claims: &Claims) -> Result<impl warp::Reply, warp::Rejection> {
+  info!("username: {}", login.username);
+  match db::get_user(&login.username) {
+    Some(_) => {
+      let pwh = User::hash_pw(&login.password);
+      match db::add_user(&login.password, &pwh) {
+        Ok(_) => Ok(warp::reply()),
+        Err(e) => Err(warp::reject::bad_request()),
+      }
+    }
+    None => Err(warp::reject::bad_request()),
+  }
+}
+
+//////////////////
+/// websockets ///
+//////////////////
 
 fn ws_created(
   ws: WebSocket,
@@ -212,6 +256,10 @@ pub fn ws_send_message(user_id: &i32, message: FeedMessage, state: &UserWebsocke
   };
 }
 
+/////////////
+/// feeds ///
+/////////////
+
 fn show_feeds(claims: Claims) -> Result<impl warp::Reply, warp::Rejection> {
   match get_subscribed_feeds(&claims.id) {
     Some(feeds) => Ok(warp::reply::json(&feeds)),
@@ -219,16 +267,9 @@ fn show_feeds(claims: Claims) -> Result<impl warp::Reply, warp::Rejection> {
   }
 }
 
-fn authenticate(params: Login) -> Result<impl warp::Reply, warp::Rejection> {
-  match User::check_user(&params.username, &params.password) {
-    Some(user) => {
-      let jwt = generate_jwt(&user).unwrap();
-      let json_body = json!({ "token": jwt, });
-      Ok(warp::reply::json(&json_body))
-    }
-    _ => Err(warp::reject::bad_request()),
-  }
-}
+/////////////
+/// items ///
+/////////////
 
 fn show_item(claims: Claims, item_id: i32) -> Result<impl warp::Reply, warp::Rejection> {
   let user_id = claims.id.clone();
@@ -261,6 +302,10 @@ fn show_items(
   }
 }
 
+//////////////
+/// assets ///
+//////////////
+
 fn serve_static(asset: AssetFile) -> impl Future<Item = Response<Body>, Error = Rejection> + Send {
   let asset_path = path::Path::new(&ASSET_PATH).join(asset.0);
   tokio_fs::file::File::open(asset_path)
@@ -276,6 +321,21 @@ fn serve_static(asset: AssetFile) -> impl Future<Item = Response<Body>, Error = 
       };
       Err(err)
     })
+}
+
+///////////
+/// JWT ///
+///////////
+
+fn authenticate(params: Login) -> Result<impl warp::Reply, warp::Rejection> {
+  match User::check_user(&params.username, &params.password) {
+    Some(user) => {
+      let jwt = generate_jwt(&user).unwrap();
+      let json_body = json!({ "token": jwt, });
+      Ok(warp::reply::json(&json_body))
+    }
+    _ => Err(warp::reject::bad_request()),
+  }
 }
 
 fn decode_jwt(token: String) -> Result<Claims, StatusCode> {

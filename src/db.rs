@@ -151,8 +151,7 @@ pub fn update_item(iid: i32, item: NewItem) {
       summary.eq(item.summary),
       published_at.eq(item.published_at),
       content.eq(item.content),
-    ))
-    .execute(&*connection)
+    )).execute(&*connection)
     .expect("failed to update item");
 }
 
@@ -208,6 +207,16 @@ pub fn get_user(uname: &str) -> Option<User> {
     Ok(user) => Some(user),
     Err(_) => None,
   }
+}
+
+pub fn add_user(uname: &str, pw_hash: &str) -> Result<usize, diesel::result::Error> {
+  use schema::users::dsl::*;
+
+  let pool = establish_pool();
+  let connection = pool.get().unwrap();
+  diesel::insert_into(users)
+    .values((username.eq(uname), password_hash.eq(pw_hash.as_bytes())))
+    .execute(&*connection)
 }
 
 // subscribed_feeds
@@ -284,8 +293,8 @@ pub fn get_subscribed_item(iid: i32, uid: i32) -> Option<SubscribedItem> {
         diesel::update(
           subscribed_items::table.filter(subscribed_items::id.eq(item.subscribed_item_id)),
         ).set(subscribed_items::seen.eq(true))
-          .execute(&*connection)
-          .expect("Failed to update 'seen' status");
+        .execute(&*connection)
+        .expect("Failed to update 'seen' status");
         Some(item)
       }
       Err(_) => None,
@@ -316,8 +325,7 @@ pub fn insert_subscribed_items(items: Vec<(&i32, &i32, bool)>) {
         subscribed_items::item_id.eq(i.1),
         subscribed_items::seen.eq(i.2),
       )
-    })
-    .collect();
+    }).collect();
 
   let pool = establish_pool();
   let connection = pool.get().unwrap();

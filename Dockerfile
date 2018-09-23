@@ -35,7 +35,6 @@ WORKDIR /app
 RUN mkdir ./ui
 RUN mkdir ./ui/dist
 COPY --from=build app/target/release/hermes .
-COPY --from=build app/target/release/add_user .
 COPY --from=build app/ui/dist ./ui/dist
 COPY --from=build /usr/local/cargo/bin/diesel /usr/bin/diesel
 
