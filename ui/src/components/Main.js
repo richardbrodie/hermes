@@ -175,6 +175,7 @@ export default class Main extends Component {
   send_add_new_feed_handler(feed_url) {
     let data = { msg_type: "Subscribe", data: feed_url }
     this.state.ws_handler.send(JSON.stringify(data))
+    this.props.history.push('/');
   }
 
   mark_item_as_read(item, id) {

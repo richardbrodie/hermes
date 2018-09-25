@@ -37,7 +37,7 @@ class AddFeedForm extends PureComponent {
     return (
       <Form>
         <h2>{this.props.heading}</h2>
-        <form name={this.props.name} onSubmit={this.handler}>
+        <form name={this.props.name} onSubmit={this.props.handler}>
           <Input name="feed-url" type="text" placeholder="feed url" />
           <Button>{this.props.button}</Button>
         </form>

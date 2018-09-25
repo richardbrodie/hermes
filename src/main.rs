@@ -1,4 +1,4 @@
-#![allow(unused)]
+// #![allow(unused)]
 extern crate atom_syndication;
 extern crate base64;
 #[macro_use]

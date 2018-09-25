@@ -8,7 +8,7 @@ class Sidebar extends Component {
     return (
       <StyledSidebar>
         <StyledTopBar>
-          <Logo src={'/favicon2.png'} />
+          <Logo src={'/favicon.png'} />
           <Link to="/">hermes</Link>
         </StyledTopBar>
         <StyledFeedList>

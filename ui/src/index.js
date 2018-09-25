@@ -5,7 +5,7 @@ import { BrowserRouter as Router } from 'react-router-dom';
 
 // mine
 import App from './components/App';
-require('./favicon2.png')
+require('./favicon.png')
 
 ReactDOM.render((
   <Router>

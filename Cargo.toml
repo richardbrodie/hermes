@@ -32,7 +32,3 @@ tokio-fs = "0.1"
 tokio-io = "0.1"
 url = "1.7.0"
 warp = ""
-
-[[bin]]
-name = "hermes"
-path = "src/hermes.rs"

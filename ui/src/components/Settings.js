@@ -49,9 +49,9 @@ export default class Settings extends Component {
     fetch(req)
       .then(resp => {
         if (resp.ok) {
-          console.log("add feed success: ", `${resp.status}: ${resp.statusText}`)
+          console.log("send settings success: ", `${resp.status}: ${resp.statusText}`)
         } else {
-          console.log("add feed error: ", `${resp.status}: ${resp.statusText}`)
+          console.log("send settings error: ", `${resp.status}: ${resp.statusText}`)
         }
       })
       .catch(error => console.log("add feed error: ", error));

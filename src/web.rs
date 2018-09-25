@@ -180,20 +180,20 @@ pub fn start_web(state: UserWebsocketState) {
 
 fn change_settings(
   settings: &Settings,
-  claims: &Claims,
+  _claims: &Claims,
 ) -> Result<impl warp::Reply, warp::Rejection> {
   info!("settings: {:?}", settings);
   Ok(warp::reply())
 }
 
-fn add_user(login: &Login, claims: &Claims) -> Result<impl warp::Reply, warp::Rejection> {
+fn add_user(login: &Login, _claims: &Claims) -> Result<impl warp::Reply, warp::Rejection> {
   info!("username: {}", login.username);
   match db::get_user(&login.username) {
     Some(_) => {
       let pwh = User::hash_pw(&login.password);
       match db::add_user(&login.password, &pwh) {
         Ok(_) => Ok(warp::reply()),
-        Err(e) => Err(warp::reject::bad_request()),
+        Err(_e) => Err(warp::reject::bad_request()),
       }
     }
     None => Err(warp::reject::bad_request()),

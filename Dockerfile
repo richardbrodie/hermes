@@ -1,4 +1,4 @@
-FROM rust:latest as build
+FROM rust:latest as rustbuilder
 
 RUN apt-get update && apt-get install -y \
   apt-utils \
@@ -8,39 +8,37 @@ RUN apt-get update && apt-get install -y \
   libclang-dev \
   apt-transport-https
 
-RUN curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | apt-key add -
-RUN echo "deb https://dl.yarnpkg.com/debian/ stable main" | tee /etc/apt/sources.list.d/yarn.list
-RUN curl -sL https://deb.nodesource.com/setup_10.x | bash -
-RUN apt-get update && apt-get install -y nodejs yarn
-
-RUN cargo install diesel_cli --no-default-features --features postgres
-
-RUN USER=root cargo new --bin app
-WORKDIR /app
-
-COPY ./ui ./ui
-RUN cd ui && yarn install
-RUN cd ui && yarn build
+RUN USER=root cargo new --bin hermes
+WORKDIR /hermes
 
 COPY ./Cargo.lock ./Cargo.lock
 COPY ./Cargo.toml ./Cargo.toml
+
+RUN cargo build --release
+RUN rm src/*.rs
+
 COPY ./src ./src
 
 RUN cargo build --release
 
+
+FROM node:10-alpine as jsbuilder
+
+WORKDIR /ui
+
+COPY ./ui ./
+
+RUN yarn install
+RUN yarn build
+
+
 FROM debian:stretch-slim
-RUN apt update && apt install -y libssl-dev openssl libpq5 netcat-openbsd ca-certificates
+RUN apt update && apt install -y libpq5 netcat-openbsd
 
 WORKDIR /app
-RUN mkdir ./ui
-RUN mkdir ./ui/dist
-COPY --from=build app/target/release/hermes .
-COPY --from=build app/ui/dist ./ui/dist
-COPY --from=build /usr/local/cargo/bin/diesel /usr/bin/diesel
+COPY --from=rustbuilder hermes/target/release/hermes .
+COPY --from=jsbuilder ui/dist ./ui/dist
 
-COPY ./Cargo.toml ./Cargo.toml
-COPY ./Cargo.lock ./Cargo.lock
-COPY ./migrations ./migrations
 COPY ./docker-entrypoint.sh ./docker-entrypoint.sh
 
 EXPOSE 3030
