@@ -1,8 +1,7 @@
 import React, { Component } from 'react';
 import InfiniteScroll from 'react-infinite-scroller';
 import styled from 'styled-components';
-
-import { ItemListItem } from './ItemListItem';
+import { ItemListItem } from './ItemListItem/ItemListItem'
 
 class ItemList extends Component {
   constructor(props) {

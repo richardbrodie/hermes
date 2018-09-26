@@ -1,7 +1,7 @@
 import React, { PureComponent } from "react"
 import styled from 'styled-components';
 
-import { StyledTime } from './ItemListItem';
+import { StyledTime } from './Elements';
 
 class SingleItem extends PureComponent {
   constructor(props) {

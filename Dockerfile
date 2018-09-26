@@ -1,12 +1,14 @@
 FROM rust:latest as rustbuilder
 
 RUN apt-get update && apt-get install -y \
+  apt-transport-https \
   apt-utils \
-  libssl-dev openssl \
-  pkg-config \
-  clang \
-  libclang-dev \
-  apt-transport-https
+  # clang \
+  # libclang-dev \
+  libpq5 \
+  libssl-dev \
+  openssl \
+  pkg-config
 
 RUN USER=root cargo new --bin hermes
 WORKDIR /hermes
@@ -15,9 +17,9 @@ COPY ./Cargo.lock ./Cargo.lock
 COPY ./Cargo.toml ./Cargo.toml
 
 RUN cargo build --release
-RUN rm src/*.rs
 
 COPY ./src ./src
+RUN touch src/main.rs
 
 RUN cargo build --release
 

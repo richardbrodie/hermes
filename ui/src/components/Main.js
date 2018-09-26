@@ -6,7 +6,7 @@ import Sockette from 'sockette';
 import AddFeed from './AddFeed'
 import ItemList from './ItemList'
 import SingleItem from './SingleItem'
-import Sidebar from './Sidebar'
+import Sidebar from './Sidebar/Sidebar'
 import Settings from './Settings'
 import * as store from './local_storage';
 
