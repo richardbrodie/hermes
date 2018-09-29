@@ -8,6 +8,7 @@ use warp::ws::Message;
 
 use db::get_user;
 use schema::*;
+use web::types::IncomingMessageType;
 
 //////////
 // Feed //
@@ -155,7 +156,7 @@ pub struct SubscribedFeed {
 // Composite //
 ///////////////
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct CompositeItem {
   pub id: i32,
   pub title: String,
@@ -255,24 +256,73 @@ fn parse_date(date: &str) -> Option<DateTime<Utc>> {
 ///////////////
 // Websocket //
 ///////////////
-///
+
 #[derive(Debug, Serialize)]
-pub struct FeedMessage<'a> {
-  pub feed_id: i32,
-  pub feed: SubscribedFeed,
-  pub items: Option<&'a Vec<CompositeItem>>,
+pub enum OutgoingWebsocketMessageType {
+  NewFeed,
+  NewItems,
+  ActionResult,
 }
-impl<'a> FeedMessage<'a> {
-  pub fn new(feed: SubscribedFeed, items: Option<&'a Vec<CompositeItem>>) -> Self {
-    FeedMessage {
+#[derive(Debug, Serialize)]
+pub enum OutgoingWebsocketMessageData {
+  NewFeed(FeedMessage),
+  NewItems(ItemsMessage),
+  ActionResult(ResultMessage),
+}
+#[derive(Debug, Serialize)]
+pub struct OutgoingWebsocketMessage {
+  id: OutgoingWebsocketMessageType,
+  pub data: OutgoingWebsocketMessageData,
+}
+impl OutgoingWebsocketMessage {
+  pub fn new_feed(feed: SubscribedFeed) -> Self {
+    let p = FeedMessage {
       feed_id: feed.id,
       feed: feed,
-      items: items,
+    };
+    OutgoingWebsocketMessage {
+      id: OutgoingWebsocketMessageType::NewFeed,
+      data: OutgoingWebsocketMessageData::NewFeed(p),
     }
   }
-
+  pub fn new_items(feed_id: i32, items: Vec<CompositeItem>) -> Self {
+    let p = ItemsMessage {
+      feed_id: feed_id,
+      items: items,
+    };
+    OutgoingWebsocketMessage {
+      id: OutgoingWebsocketMessageType::NewItems,
+      data: OutgoingWebsocketMessageData::NewItems(p),
+    }
+  }
+  pub fn action_result(action: IncomingMessageType, result: bool) -> Self {
+    let p = ResultMessage {
+      id: action,
+      result: result,
+    };
+    OutgoingWebsocketMessage {
+      id: OutgoingWebsocketMessageType::ActionResult,
+      data: OutgoingWebsocketMessageData::ActionResult(p),
+    }
+  }
   pub fn to_message(&self) -> Message {
     let msg = json!(self);
     Message::text(msg.to_string())
   }
+}
+
+#[derive(Debug, Serialize)]
+pub struct FeedMessage {
+  pub feed_id: i32,
+  pub feed: SubscribedFeed,
+}
+#[derive(Debug, Serialize)]
+pub struct ItemsMessage {
+  pub feed_id: i32,
+  pub items: Vec<CompositeItem>,
+}
+#[derive(Serialize, Debug)]
+pub struct ResultMessage {
+  pub id: IncomingMessageType,
+  pub result: bool,
 }

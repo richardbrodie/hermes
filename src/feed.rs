@@ -16,8 +16,8 @@ use db::{
   self, find_duplicates, get_channel_urls_and_subscribers, insert_channel, insert_items,
   insert_subscribed_items, update_item,
 };
-use models::{CompositeItem, FeedMessage, Item, NewFeed, NewItem};
-use web::{ws_send_message, UserWebsocketState};
+use models::{CompositeItem, FeedMessage, Item, NewFeed, NewItem, OutgoingWebsocketMessage};
+use web::{types::SubscribeParams, types::UserWebsocketState, ws::ws_send_message};
 
 enum FeedType {
   RSS(rss::Channel),
@@ -57,7 +57,8 @@ pub fn start_interval_loops(global_user_state: UserWebsocketState) {
   rt::spawn(update_subscriptions);
 }
 
-pub fn subscribe_feed(url: String, user_id: i32, state: UserWebsocketState) {
+pub fn subscribe_feed(url: SubscribeParams, user_id: i32, state: UserWebsocketState) {
+  let url = url.feed_url;
   debug!("subscribing: '{}' by '{}'", url, user_id);
   let work = db::get_feed_id(&url)
     .into_future()
@@ -131,22 +132,31 @@ fn send_items(
     .map(|item| CompositeItem::from_item(&item))
     .collect();
   for uid in subscriber_ids.iter() {
-    let feed = db::get_subscribed_feed(uid, &feed_id);
-    let msg = FeedMessage::new(feed.unwrap(), Some(&composites));
-    ws_send_message(&uid, msg, state);
+    send_ws(feed_id, *uid, &composites, state);
   }
 }
 
 fn send_subscribeditems(feed_id: i32, user_id: i32, state: &UserWebsocketState) {
-  let feed = db::get_subscribed_feed(&user_id, &feed_id);
   let items = db::get_subscribed_items(feed_id, user_id, None);
   let composites: Vec<_> = items
     .unwrap()
     .into_iter()
     .map(|item| CompositeItem::from_subscribed(&item))
     .collect();
-  let msg = FeedMessage::new(feed.unwrap(), Some(&composites));
-  ws_send_message(&user_id, msg, &state);
+  send_ws(feed_id, user_id, &composites, state);
+}
+
+fn send_ws(
+  feed_id: i32,
+  user_id: i32,
+  composites: &Vec<CompositeItem>,
+  state: &UserWebsocketState,
+) {
+  let feed = db::get_subscribed_feed(&user_id, &feed_id);
+  let msg = OutgoingWebsocketMessage::new_feed(feed.unwrap());
+  ws_send_message(&user_id, msg.to_message(), &state);
+  let msg = OutgoingWebsocketMessage::new_items(feed_id, composites.to_vec());
+  ws_send_message(&user_id, msg.to_message(), &state);
 }
 
 /////////////////////////

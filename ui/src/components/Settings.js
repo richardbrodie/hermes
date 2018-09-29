@@ -1,5 +1,6 @@
 import React, { Component } from 'react';
 import { ChangePasswordForm, StyledContainer, UsernamePasswordForm } from './Forms'
+import { Button } from './Elements'
 import * as store from './local_storage';
 
 export default class Settings extends Component {
@@ -7,6 +8,7 @@ export default class Settings extends Component {
     super(props);
     this.handlePasswordChange = this.handlePasswordChange.bind(this);
     this.handleAddUser = this.handleAddUser.bind(this);
+    this.handleLogout = this.handleLogout.bind(this);
   }
 
   handlePasswordChange(event) {
@@ -33,6 +35,14 @@ export default class Settings extends Component {
       }
     };
     this.sendSettings(data)
+  }
+
+  handleLogout(event) {
+    event.preventDefault();
+    console.log("logging out");
+    store.remove_jwt();
+    // console.log(this.props.history)
+    this.props.history.push('/');
   }
 
   sendSettings(data) {
@@ -65,6 +75,7 @@ export default class Settings extends Component {
     return (
       <StyledContainer>
         <h2>User settings</h2>
+        <Button onClick={this.handleLogout}>Logout</Button>
         <ChangePasswordForm name={"change_password"} heading={"Change password"} button={"Save"} handler={this.handlePasswordChange} />
         {adminBlock}
       </StyledContainer>

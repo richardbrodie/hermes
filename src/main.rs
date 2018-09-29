@@ -1,13 +1,12 @@
-// #![allow(unused)]
+#![allow(unused)]
 extern crate atom_syndication;
 extern crate base64;
+extern crate chrono;
 #[macro_use]
 extern crate diesel;
-extern crate chrono;
 extern crate dotenv;
 #[macro_use]
 extern crate log;
-extern crate failure;
 extern crate futures;
 extern crate hyper;
 extern crate hyper_tls;
@@ -46,7 +45,7 @@ pub mod web;
 
 use db::create_admin_user;
 use feed::start_interval_loops;
-use web::{start_web, UserWebsocketState};
+use web::{start_web, types::UserWebsocketState};
 
 fn main() {
   dotenv().ok();

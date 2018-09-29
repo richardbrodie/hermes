@@ -209,7 +209,7 @@ pub fn get_user(uname: &str) -> Option<User> {
   }
 }
 
-pub fn add_user(uname: &str, pw_hash: &str) -> Result<usize, diesel::result::Error> {
+pub fn create_user(uname: &str, pw_hash: &str) -> Result<usize, diesel::result::Error> {
   use schema::users::dsl::*;
 
   let pool = establish_pool();
