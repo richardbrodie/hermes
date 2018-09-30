@@ -1,7 +1,7 @@
 import React, { Component } from 'react';
 import { Route, Switch, Redirect } from 'react-router-dom';
 
-import Main from './Main'
+import Main from './Main/Main'
 import Login from './Login'
 import * as store from './local_storage'
 
