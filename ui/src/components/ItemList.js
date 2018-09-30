@@ -1,4 +1,4 @@
-import React, { Component } from 'react';
+import React, { Component } from 'preact';
 import InfiniteScroll from 'react-infinite-scroller';
 import styled from 'styled-components';
 import { ItemListItem } from './ItemListItem/ItemListItem'

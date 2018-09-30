@@ -1,4 +1,4 @@
-import React, { Component } from 'react';
+import React, { Component } from 'preact';
 import { Redirect } from 'react-router-dom';
 import * as store from './local_storage';
 

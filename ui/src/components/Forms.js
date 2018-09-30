@@ -1,8 +1,8 @@
-import React, { PureComponent } from 'react';
+import React, { Component } from 'preact';
 import styled from 'styled-components';
 import { Input, Button, Form } from './Elements'
 
-class UsernamePasswordForm extends PureComponent {
+class UsernamePasswordForm extends Component {
   render() {
     return (
       <Form>

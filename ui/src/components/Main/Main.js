@@ -1,4 +1,4 @@
-import React, { Component } from 'react';
+import React, { Component } from 'preact';
 import { Route, Switch } from 'react-router-dom';
 import Sockette from 'sockette';
 

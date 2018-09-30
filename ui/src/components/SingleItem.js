@@ -1,9 +1,9 @@
-import React, { PureComponent } from "react"
+import React, { Component } from "preact"
 import styled from 'styled-components';
 
 import { StyledTime } from './Elements';
 
-class SingleItem extends PureComponent {
+class SingleItem extends Component {
   constructor(props) {
     super(props)
     props.handler(props.match.params.id)

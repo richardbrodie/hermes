@@ -1,6 +1,7 @@
-import React, { Component } from 'react';
+import React, { Component } from 'preact';
 import { ChangePasswordForm, StyledContainer, UsernamePasswordForm } from './Forms'
 import { Button } from './Elements'
+// import { Button } from 'rebass'
 import * as store from './local_storage';
 
 export default class Settings extends Component {

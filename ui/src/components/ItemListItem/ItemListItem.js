@@ -1,9 +1,9 @@
-import React, { PureComponent } from 'react';
+import React, { Component } from 'preact';
 import { Link } from 'react-router-dom';
 import { FeedItem, Description } from './styles'
 import { StyledTime } from '../Elements'
 
-class ItemListItem extends PureComponent {
+class ItemListItem extends Component {
   render() {
     var item = this.props.item;
     return (

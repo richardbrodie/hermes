@@ -1,4 +1,4 @@
-import React, { Component } from "react"
+import React, { Component } from "preact"
 import { Link } from "react-router-dom"
 import {
   Logo,

@@ -2,6 +2,12 @@ const path = require('path');
 const HtmlWebPackPlugin = require("html-webpack-plugin");
 
 module.exports = {
+  "resolve": {
+    "alias": {
+      "react": "preact-compat",
+      "react-dom": "preact-compat"
+    }
+  },
   module: {
     rules: [
       {
@@ -22,13 +28,6 @@ module.exports = {
           {
             loader: "html-loader"
           }
-        ]
-      },
-      {
-        test: /\.css$/,
-        use: [
-          "style-loader", // creates style nodes from JS strings
-          "css-loader" // translates CSS into CommonJS
         ]
       },
       {

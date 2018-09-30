@@ -1,13 +1,12 @@
 // theirs
-import React from 'react';
-import ReactDOM from 'react-dom';
+import React, { render } from 'preact';
 import { BrowserRouter as Router } from 'react-router-dom';
 
 // mine
 import App from './components/App';
 require('./favicon.png')
 
-ReactDOM.render((
+render((
   <Router>
     <App />
   </Router>
