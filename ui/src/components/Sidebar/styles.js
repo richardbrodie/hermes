@@ -1,5 +1,5 @@
 import styled from 'styled-components';
-import { NavLink, Link } from "react-router-dom"
+import { Link } from "@reach/router";
 
 const Logo = styled.img`
 max-height: 35px;
@@ -37,7 +37,7 @@ margin-right: auto;
 margin-top: auto;
 `;
 
-const FeedLink = styled(NavLink)`
+const FeedLink = styled(Link)`
 padding: 10px 10px;
 border-bottom: 1px solid #d1cfcf;
 display: flex;

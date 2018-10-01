@@ -1,4 +1,4 @@
-import React, { Component } from "preact"
+import React, { Component } from "react"
 import styled from 'styled-components';
 
 import { StyledTime } from './Elements';
@@ -6,7 +6,7 @@ import { StyledTime } from './Elements';
 class SingleItem extends Component {
   constructor(props) {
     super(props)
-    props.handler(props.match.params.id)
+    props.handler(props.id)
   }
 
   render() {

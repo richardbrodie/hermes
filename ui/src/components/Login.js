@@ -1,5 +1,5 @@
-import React, { Component } from 'preact';
-import { Redirect } from 'react-router-dom';
+import React, { Component } from 'react';
+import { Redirect, navigate } from "@reach/router";
 import * as store from './local_storage';
 
 import { UsernamePasswordForm, StyledContainer } from './Forms'
@@ -34,16 +34,17 @@ class Login extends Component {
       .then(resp => resp.json())
       .then(data => {
         store.set_jwt(data.token);
-        this.props.history.push('/');
+        navigate('/');
       })
       .catch(error => {
+        console.log("error: ", error)
         store.remove_jwt();
       });
   }
 
   render() {
     if (store.logged_in()) {
-      return <Redirect to="/" />;
+      return <Redirect to="/" noThrow />;
     } else {
       return (
         <StyledContainer>

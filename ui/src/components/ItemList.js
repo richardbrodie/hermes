@@ -1,4 +1,4 @@
-import React, { Component } from 'preact';
+import React, { Component } from 'react';
 import InfiniteScroll from 'react-infinite-scroller';
 import styled from 'styled-components';
 import { ItemListItem } from './ItemListItem/ItemListItem'
@@ -6,12 +6,12 @@ import { ItemListItem } from './ItemListItem/ItemListItem'
 class ItemList extends Component {
   constructor(props) {
     super(props);
-    this.props.handler(props.match.params.id)
+    this.props.handler(props.id)
   }
 
   shouldComponentUpdate(nextProps) {
-    if (nextProps.match.params.id !== this.props.match.params.id) {
-      this.props.handler(nextProps.match.params.id)
+    if (nextProps.id !== this.props.id) {
+      this.props.handler(nextProps.id)
       return false
     }
     if (nextProps.items_data !== this.props.items_data) {
@@ -31,15 +31,7 @@ class ItemList extends Component {
 
     return (
       <FeedItems>
-        <InfiniteScroll
-          pageStart={0}
-          loadMore={this.props.load_more_handler}
-          hasMore={true}
-          initialLoad={false}
-          useWindow={false}
-        >
-          {items}
-        </InfiniteScroll>
+        {items}
       </FeedItems>
     );
   }

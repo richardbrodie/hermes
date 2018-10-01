@@ -2,12 +2,6 @@ const path = require('path');
 const HtmlWebPackPlugin = require("html-webpack-plugin");
 
 module.exports = {
-  "resolve": {
-    "alias": {
-      "react": "preact-compat",
-      "react-dom": "preact-compat"
-    }
-  },
   module: {
     rules: [
       {

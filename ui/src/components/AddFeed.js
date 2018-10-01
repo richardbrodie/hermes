@@ -1,4 +1,4 @@
-import React, { Component } from 'preact';
+import React, { Component } from 'react';
 import { AddFeedForm, StyledContainer } from './Forms'
 
 class AddFeed extends Component {

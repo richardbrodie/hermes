@@ -1,5 +1,5 @@
-import React, { Component } from "preact"
-import { Link } from "react-router-dom"
+import React, { Component } from "react"
+import { Link } from "@reach/router";
 import {
   Logo,
   StyledSidebar,

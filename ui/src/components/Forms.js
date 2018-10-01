@@ -1,4 +1,4 @@
-import React, { Component } from 'preact';
+import React, { Component } from 'react';
 import styled from 'styled-components';
 import { Input, Button, Form } from './Elements'
 
@@ -17,7 +17,7 @@ class UsernamePasswordForm extends Component {
   }
 }
 
-class ChangePasswordForm extends PureComponent {
+class ChangePasswordForm extends Component {
   render() {
     return (
       <Form>
@@ -33,7 +33,7 @@ class ChangePasswordForm extends PureComponent {
   }
 }
 
-class AddFeedForm extends PureComponent {
+class AddFeedForm extends Component {
   render() {
     return (
       <Form>

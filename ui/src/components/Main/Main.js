@@ -1,5 +1,5 @@
-import React, { Component } from 'preact';
-import { Route, Switch } from 'react-router-dom';
+import React, { Component } from 'react';
+import { Router } from "@reach/router";
 import Sockette from 'sockette';
 
 import AddFeed from '../AddFeed'
@@ -55,14 +55,12 @@ export default class Main extends Component {
     return (
       <MainView>
         <Sidebar feeds_data={this.state.feeds_data} />
-
-        <Switch>
-          <Route path="/feed/:id"
-            render={(props) => <ItemList {...props} handler={this.select_feed_handler} items_data={this.state.items_data} load_more_handler={this.load_more_items_handler} />} />
-          <Route path="/add" render={(props) => <AddFeed {...props} handler={this.add_new_feed_handler} />} />
-          <Route path="/settings" render={(props) => <Settings {...props} />} />
-          <Route path="/item/:id" render={(props) => <SingleItem {...props} handler={this.select_item_handler} item={this.state.selected_item} />} />
-        </Switch>
+        <Router>
+          <ItemList path="feed/:id" handler={this.select_feed_handler} items_data={this.state.items_data} load_more_handler={this.load_more_items_handler} />
+          <AddFeed path="add" handler={this.add_new_feed_handler} />
+          <Settings path="settings" />
+          <SingleItem path="item/:id" handler={this.select_item_handler} item={this.state.selected_item} />
+        </Router>
       </MainView>
     )
   }

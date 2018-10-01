@@ -3,9 +3,10 @@
   "version": "1.0.0",
   "license": "MIT",
   "dependencies": {
+    "@reach/router": "1.2.1",
     "jwt-decode": "^2.2.0",
-    "preact": "^8.3.1",
-    "preact-compat": "^3.18.4",
+    "react": "^16.5.2",
+    "react-dom": "^16.5.2",
     "react-infinite-scroller": "^1.2.1",
     "react-router-dom": "^4.3.1",
     "react-timeago": "^4.1.9",
@@ -24,13 +25,16 @@
     "html-loader": "^0.5.5",
     "html-webpack-plugin": "^3.2.0",
     "image-webpack-loader": "^4.3.1",
-    "styled-components": "",
+    "styled-components": "^4.0.0-beta.9",
     "webpack": "^4.20.2",
-    "webpack-cli": "^3.1.2"
+    "webpack-cli": "^3.1.2",
+    "webpack-dev-server": "^3.1.9"
   },
   "scripts": {
     "watch": "webpack --mode development --watch",
     "build": "webpack --mode production",
-    "dev": "webpack --mode development"
-  }
+    "dev": "webpack --mode development",
+    "serve": "webpack-dev-server --mode development"
+  },
+  "proxy": "http://localhost:3030"
 }
