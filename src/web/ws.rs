@@ -9,7 +9,7 @@ use super::types::{
 
 use db::mark_subscribed_item_as_read;
 use feed;
-use models::{Claims, FeedMessage, OutgoingWebsocketMessage};
+use models::{Claims, OutgoingWebsocketMessage};
 
 pub fn ws_created(
   ws: WebSocket,

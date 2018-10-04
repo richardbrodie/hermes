@@ -16,7 +16,7 @@ use db::{
   self, find_duplicates, get_channel_urls_and_subscribers, insert_channel, insert_items,
   insert_subscribed_items, update_item,
 };
-use models::{CompositeItem, FeedMessage, Item, NewFeed, NewItem, OutgoingWebsocketMessage};
+use models::{CompositeItem, Item, NewFeed, NewItem, OutgoingWebsocketMessage};
 use web::{types::SubscribeParams, types::UserWebsocketState, ws::ws_send_message};
 
 enum FeedType {

@@ -35,7 +35,7 @@ RUN yarn build
 
 
 FROM debian:stretch-slim
-RUN apt update && apt install -y libpq5 netcat-openbsd
+RUN apt update && apt install -y libpq5 netcat-openbsd ca-certificates
 
 WORKDIR /app
 COPY --from=rustbuilder hermes/target/release/hermes .
