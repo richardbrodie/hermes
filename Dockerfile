@@ -3,12 +3,12 @@ FROM rust:latest as rustbuilder
 RUN apt-get update && apt-get install -y \
   apt-transport-https \
   apt-utils \
-  # clang \
-  # libclang-dev \
   libpq5 \
   libssl-dev \
   openssl \
   pkg-config
+
+RUN cargo install diesel_cli --no-default-features --features postgres
 
 RUN USER=root cargo new --bin hermes
 WORKDIR /hermes
@@ -44,7 +44,9 @@ FROM debian:stretch-slim
 RUN apt update && apt install -y libpq5 netcat-openbsd ca-certificates
 
 WORKDIR /app
+COPY --from=rustbuilder /usr/local/cargo/bin/diesel /usr/bin/diesel
 COPY --from=rustbuilder hermes/target/release/hermes .
+COPY ./migrations ./migrations
 COPY --from=jsbuilder ui/dist ./ui/dist
 
 COPY ./docker-entrypoint.sh ./docker-entrypoint.sh
