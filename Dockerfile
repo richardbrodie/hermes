@@ -30,6 +30,12 @@ WORKDIR /ui
 
 COPY ./ui ./
 
+RUN apk add --no-cache \
+    build-base \
+    libpng-dev \
+    lcms2-dev \
+    bash
+
 RUN yarn install
 RUN yarn build
 
